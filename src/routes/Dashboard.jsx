@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { supabase } from '../lib/supabase.js'
 import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
+import { aggregate, METRICS, fmtVal } from '../lib/metrics.js'
+import { health } from '../lib/successMap.js'
 
 // Command center — migrated from dashboard.html (Pass 1: client directory,
 // quick-launch links/files, and client info detail view).
@@ -39,6 +42,12 @@ export default function Dashboard() {
   const [detailId, setDetailId] = useState(null)
   const [linkModal, setLinkModal] = useState(null) // {id?, clientId}
   const [toast, setToast] = useState('')
+  const [tasks, setTasks] = useState([])
+  const [metricsByClient, setMetricsByClient] = useState({})
+  const [snaps] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } })
+  const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true } } })
+  const navigate = useNavigate()
+  const toggleLayer = (k) => setToggles((t) => { const n = { ...t, [k]: !t[k] }; try { localStorage.setItem('faa_dash_toggles', JSON.stringify(n)) } catch { /* ignore */ } return n })
 
   useEffect(() => {
     ;(async () => {
@@ -46,6 +55,14 @@ export default function Dashboard() {
       if (Array.isArray(cs)) setClients(cs.map((r) => ({ ...r, info: r.info || {} })))
       const { data: st } = await supabase.from('app_state').select('data').eq('id', STATE_ID).maybeSingle()
       if (st?.data) { setAppData(st.data); if (Array.isArray(st.data.links)) setLinks(st.data.links) }
+      const { data: ts } = await supabase.from('tasks').select('client_id,status')
+      if (Array.isArray(ts)) setTasks(ts)
+      const { data: mrows } = await supabase.from('metrics_tracker').select('client_id,period,date_key,data')
+      if (Array.isArray(mrows)) {
+        const by = {}
+        mrows.filter((r) => r.period === 'daily').forEach((r) => { by[r.client_id] = by[r.client_id] || {}; by[r.client_id][r.date_key] = r.data || {} })
+        setMetricsByClient(by)
+      }
     })()
   }, [])
 
@@ -66,6 +83,11 @@ export default function Dashboard() {
   }
   async function deleteLink(id) { await persistLinks(links.filter((l) => l.id !== id)); setLinkModal(null); showToast('Link deleted') }
 
+  const M = (id) => METRICS.find((m) => m.id === id)
+  const openTasks = (cid) => tasks.filter((t) => t.client_id === cid && t.status !== 'done').length
+  const clientHealth = (cid) => { const s = snaps[cid] || []; if (!s.length) return null; const latest = [...s].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-1)[0]; return health(latest.scores) }
+  const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
+
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
   if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} editMode={editMode} onBack={() => setDetailId(null)} onOpenLink={(id) => setLinkModal({ id, clientId: detail.id })} onAddLink={() => setLinkModal({ clientId: detail.id })} modal={linkModal} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onCloseModal={() => setLinkModal(null)} toast={toast} />
 
@@ -81,12 +103,24 @@ export default function Dashboard() {
           <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All clients</button>
           {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} style={pill(String(filter) === String(c.id))}>{c.name}</button>)}
         </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Show on cards</span>
+          {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics']].map(([k, label]) => (
+            <button key={k} onClick={() => toggleLayer(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, border: '0.5px solid ' + (toggles[k] ? NAVY : 'rgba(0,0,0,0.15)'), background: toggles[k] ? 'rgba(11,29,94,0.05)' : '#fff', color: toggles[k] ? NAVY : MUTED, fontSize: 12, cursor: 'pointer' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
+            </button>
+          ))}
+        </div>
         {!clients.length && <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>Loading clients…</div>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
           {shown.map((c) => {
             const cl = links.filter((l) => l.clientId === c.id)
             const accent = c.info?.accentColor || c.accentColor || GOLD
             const meta = [c.doctor || c.info?.doctor, c.info?.timezone ? c.info.timezone.split('—')[0].trim() : ''].filter(Boolean).join(' · ')
+            const openN = openTasks(c.id)
+            const hp = clientHealth(c.id)
+            const wk = clientWeekly(c.id)
+            const go = (e, path) => { e.stopPropagation(); navigate(path) }
             return (
               <div key={c.id} onClick={() => setDetailId(c.id)} style={card}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -98,7 +132,31 @@ export default function Dashboard() {
                     </div>
                     {meta && <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{meta}</div>}
                   </div>
+                  {toggles.todos && openN > 0 && (
+                    <span onClick={(e) => go(e, '/tasks')} title="Open to-dos" style={{ flexShrink: 0, background: 'rgba(188,151,98,0.15)', color: '#8a6a3c', border: '0.5px solid rgba(188,151,98,0.4)', borderRadius: 999, fontSize: 11, fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>{openN} to-do{openN !== 1 ? 's' : ''}</span>
+                  )}
                 </div>
+                {toggles.progress && (
+                  <div onClick={(e) => go(e, '/success-map')} style={{ marginBottom: 10, cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                      <span style={{ color: MUTED }}>Success Map</span>
+                      <span style={{ color: hp === null ? MUTED : hp >= 70 ? '#18a866' : hp >= 40 ? '#e07b0a' : '#d42020', fontWeight: 600 }}>{hp === null ? 'Not assessed' : hp + '%'}</span>
+                    </div>
+                    <div style={{ height: 6, background: '#eceae7', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: (hp || 0) + '%', background: hp === null ? 'transparent' : hp >= 70 ? '#18a866' : hp >= 40 ? '#e07b0a' : '#d42020', borderRadius: 3, transition: 'width .4s' }} />
+                    </div>
+                  </div>
+                )}
+                {toggles.metrics && (
+                  <div onClick={(e) => go(e, '/metrics')} style={{ display: 'flex', gap: 6, marginBottom: 10, cursor: 'pointer' }}>
+                    {[['Leads', wk ? wk.leads : '—'], ['Closed', wk ? wk.closed : '—'], ['Revenue', wk ? fmtVal(M('total_revenue'), wk.revenue, true) : '—']].map(([l, v]) => (
+                      <div key={l} style={{ flex: 1, background: BG, borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: TEXT, lineHeight: 1.1 }}>{v}</div>
+                        <div style={{ fontSize: 9, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {cl.length === 0 && <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic', padding: '2px 0' }}>No files yet</div>}
                   {cl.map((l) => <LinkChip key={l.id} l={l} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
