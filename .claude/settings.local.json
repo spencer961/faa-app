@@ -3,7 +3,11 @@
     "allow": [
       "Skill(artifact-design)",
       "Skill(artifact-design:*)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(awk '{print length\": \"NR}' metrics.html)",
+      "Bash(awk -F: '$1>958')",
+      "Bash(git add *)",
+      "Bash(git commit -q -m ' *)"
     ]
   }
 }
