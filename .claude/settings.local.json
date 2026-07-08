@@ -7,7 +7,9 @@
       "Bash(awk '{print length\": \"NR}' metrics.html)",
       "Bash(awk -F: '$1>958')",
       "Bash(git add *)",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(grep -nE \"subview===|view===|success_map|snapshots|publishSnapshot|loadSnap|/rest/v1/|const .*=\\\\\\(\\\\\\)=>|function |=> *\\\\{$\" portal.html)",
+      "Bash(awk '{print length\": \"NR}' portal.html)"
     ]
   }
 }
