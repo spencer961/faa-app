@@ -9,7 +9,11 @@
       "Bash(git add *)",
       "Bash(git commit -q -m ' *)",
       "Bash(grep -nE \"subview===|view===|success_map|snapshots|publishSnapshot|loadSnap|/rest/v1/|const .*=\\\\\\(\\\\\\)=>|function |=> *\\\\{$\" portal.html)",
-      "Bash(awk '{print length\": \"NR}' portal.html)"
+      "Bash(awk '{print length\": \"NR}' portal.html)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(git -C \"/Users/bobbiejohealey/Documents/FAA/Full-Arch-App\" remote -v)",
+      "Bash(git -C \"/Users/bobbiejohealey/Documents/FAA/Full-Arch-App\" config user.name)"
     ]
   }
 }
