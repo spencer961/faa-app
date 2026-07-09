@@ -28,6 +28,17 @@ const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperC
 const money = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const staffList = (info) => { let s = info?.staff; if (!s) return []; try { if (typeof s === 'string') s = JSON.parse(s) } catch { return [String(info.staff)] } return Array.isArray(s) ? s : [s] }
 
+// Practices/locations live at info.practices. Some older records nest the
+// text fields (doctor, staff, notes…) one level deeper at info.info — read
+// both so nothing shows blank.
+const getPractices = (c) => (Array.isArray(c?.info?.practices) ? c.info.practices.filter(Boolean) : [])
+const infoField = (c, k) => (c?.info?.info?.[k] ?? c?.info?.[k] ?? '')
+const PRACTICE_PALETTE = [
+  { bg: '#E6F1FB', txt: '#0C447C' }, { bg: '#FAEEDA', txt: '#633806' }, { bg: '#E1F5EE', txt: '#085041' },
+  { bg: '#FDEEF6', txt: '#8C1A5A' }, { bg: '#F0EDFB', txt: '#5A3DAA' }, { bg: '#EAF3DE', txt: '#274F0A' },
+]
+const practiceColor = (name) => { let h = 0; for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return PRACTICE_PALETTE[h % PRACTICE_PALETTE.length] }
+
 const INFO_FIELDS = [
   ['doctor', 'Doctor / primary contact'], ['timezone', 'Time zone'], ['website', 'Website'],
   ['numLocations', 'No. of locations'], ['locations', 'Practice location names'],
@@ -76,12 +87,28 @@ export default function Dashboard() {
   }
   async function saveLink(form) {
     if (!form.label.trim()) return
+    const practice = form.practice || null
     let next
-    if (form.id) next = links.map((l) => (l.id === form.id ? { ...l, ...form, label: form.label.trim(), url: form.url.trim() } : l))
-    else { const id = links.reduce((m, l) => Math.max(m, l.id || 0), 0) + 1; next = [...links, { id, clientId: form.clientId, label: form.label.trim(), category: form.category.trim() || 'General', url: form.url.trim() }] }
+    if (form.id) next = links.map((l) => (l.id === form.id ? { ...l, label: form.label.trim(), category: form.category.trim() || 'General', url: form.url.trim(), clientId: form.clientId, practice } : l))
+    else { const id = links.reduce((m, l) => Math.max(m, l.id || 0), 0) + 1; next = [...links, { id, clientId: form.clientId, label: form.label.trim(), category: form.category.trim() || 'General', url: form.url.trim(), practice }] }
     await persistLinks(next); setLinkModal(null); showToast(form.id ? 'Link updated ✓' : 'Link added ✓')
   }
   async function deleteLink(id) { await persistLinks(links.filter((l) => l.id !== id)); setLinkModal(null); showToast('Link deleted') }
+
+  // First write to the clients table: update just the practices list,
+  // preserving everything else already in the client's info record.
+  async function savePractices(clientId, list) {
+    const c = clients.find((x) => x.id === clientId)
+    if (!c) return
+    const info = { ...(c.info || {}), practices: list }
+    setClients((cs) => cs.map((x) => (x.id === clientId ? { ...x, info } : x)))
+    // drop tags that point at a now-removed practice
+    const valid = new Set(list)
+    const cleaned = links.map((l) => (l.clientId === clientId && l.practice && !valid.has(l.practice) ? { ...l, practice: null } : l))
+    if (cleaned.some((l, i) => l !== links[i])) await persistLinks(cleaned)
+    await supabase.from('clients').update({ info, updated_at: new Date().toISOString() }).eq('id', clientId)
+    showToast('Practices updated ✓')
+  }
 
   const M = (id) => METRICS.find((m) => m.id === id)
   const openTasks = (cid) => tasks.filter((t) => t.client_id === cid && t.status !== 'done').length
@@ -89,7 +116,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} editMode={editMode} onBack={() => setDetailId(null)} onOpenLink={(id) => setLinkModal({ id, clientId: detail.id })} onAddLink={() => setLinkModal({ clientId: detail.id })} modal={linkModal} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onCloseModal={() => setLinkModal(null)} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} toast={toast} />
 
   const shown = filter === 'all' ? clients : clients.filter((c) => String(c.id) === String(filter))
 
@@ -179,6 +206,7 @@ function LinkChip({ l, editMode, onEdit, onDelete }) {
     <div onClick={(e) => { e.stopPropagation(); if (l.url) window.open(l.url, '_blank'); else onEdit(e) }} title={l.url || 'No URL yet — click to add'}
       style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '4px solid ' + cc.border, borderRadius: 8, background: BG, fontSize: 12, cursor: 'pointer' }}>
       <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: l.url ? TEXT : MUTED }}>{l.label}</span>
+      {l.practice && (() => { const pc = practiceColor(l.practice); return <span style={{ fontSize: 10, color: pc.txt, background: pc.bg, borderRadius: 3, padding: '1px 6px', flexShrink: 0, fontWeight: 500 }}>{l.practice}</span> })()}
       {l.category && <span style={{ fontSize: 10, color: cc.txt, background: cc.bg, borderRadius: 3, padding: '1px 6px', flexShrink: 0 }}>{l.category}</span>}
       {!l.url && <span style={{ fontSize: 10, color: MUTED, fontStyle: 'italic' }}>no url</span>}
       {editMode && <>
@@ -189,14 +217,19 @@ function LinkChip({ l, editMode, onEdit, onDelete }) {
   )
 }
 
-function Detail({ client: c, links, editMode, onBack, onAddLink, modal, clients, onSaveLink, onDeleteLink, onCloseModal, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, toast }) {
   const [linkEdit, setLinkEdit] = useState(null)
+  const [pracFilter, setPracFilter] = useState(null)
+  const [newPrac, setNewPrac] = useState('')
   const info = c.info || {}
-  const staff = staffList(info)
-  const billing = c.billing || {}
-  const payments = Array.isArray(c.payments) ? [...c.payments].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : []
+  const practices = getPractices(c)
+  const staff = staffList({ staff: infoField(c, 'staff') })
+  const billing = info.billing || c.billing || {}
+  const payments = Array.isArray(info.payments) ? [...info.payments].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : []
   const lastPay = payments[0]
   const accent = info.accentColor || c.accentColor || GOLD
+  const shownLinks = links.filter((l) => !pracFilter || !l.practice || l.practice === pracFilter)
+  const addPractice = () => { const v = newPrac.trim(); if (!v || practices.includes(v)) return; onSavePractices(c.id, [...practices, v]); setNewPrac('') }
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Client Detail" back="/" right={<button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← All clients</button>} />
@@ -210,10 +243,10 @@ function Detail({ client: c, links, editMode, onBack, onAddLink, modal, clients,
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           {INFO_FIELDS.map(([k, label]) => (
-            <InfoCard key={k} label={label} value={info[k] || (k === 'doctor' ? c.doctor : '')} />
+            <InfoCard key={k} label={label} value={infoField(c, k) || (k === 'doctor' ? c.doctor : '')} />
           ))}
           <InfoCard label="Staff / team" value={staff.length ? staff.map((s) => (typeof s === 'object' ? [s.name, s.role].filter(Boolean).join(' — ') : s)).join('\n') : ''} />
-          <InfoCard label="Notes" value={info.notes || ''} />
+          <InfoCard label="Notes" value={infoField(c, 'notes') || ''} />
         </div>
         {(billing.monthlyAmount || lastPay) && (
           <div style={{ ...sectionCard, marginBottom: 16 }}>
@@ -225,14 +258,34 @@ function Detail({ client: c, links, editMode, onBack, onAddLink, modal, clients,
             </div>
           </div>
         )}
+        <div style={{ ...sectionCard, marginBottom: 16 }}>
+          <SectionTitle>Practices / locations</SectionTitle>
+          <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Add each location, then tag a link to a location when you create it.</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {practices.length === 0 && <span style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No extra locations — this client has one practice.</span>}
+            {practices.map((p) => { const pc = practiceColor(p); return (
+              <span key={p} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: pc.txt, background: pc.bg, borderRadius: 8, padding: '4px 10px' }}>{p}<button onClick={() => onSavePractices(c.id, practices.filter((x) => x !== p))} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: pc.txt, fontSize: 15, lineHeight: 1, padding: 0 }}>×</button></span>
+            )})}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input style={{ ...inp, flex: 1 }} value={newPrac} onChange={(e) => setNewPrac(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addPractice()} placeholder="e.g. Odessa Family Dental" />
+            <button onClick={addPractice} style={btnPrimary}>Add</button>
+          </div>
+        </div>
         <div style={sectionCard}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <SectionTitle>Links & files ({links.length})</SectionTitle>
+            <SectionTitle>Links & files ({shownLinks.length})</SectionTitle>
             <button onClick={() => setLinkEdit({ clientId: c.id })} style={{ ...addRow, width: 'auto', padding: '5px 12px' }}>+ Add link</button>
           </div>
+          {practices.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              <button onClick={() => setPracFilter(null)} style={pill(pracFilter === null)}>All</button>
+              {practices.map((p) => <button key={p} onClick={() => setPracFilter(p)} style={pill(pracFilter === p)}>{p}</button>)}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {links.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No links yet.</div>}
-            {links.map((l) => <LinkChip key={l.id} l={l} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => onDeleteLink(l.id)} />)}
+            {shownLinks.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No links yet.</div>}
+            {shownLinks.map((l) => <LinkChip key={l.id} l={l} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => onDeleteLink(l.id)} />)}
           </div>
         </div>
       </div>
@@ -252,8 +305,9 @@ function InfoCard({ label, value }) {
 }
 
 function LinkModal({ modal, link, clients, onSave, onDelete, onClose }) {
-  const [form, setForm] = useState({ id: link?.id, label: link?.label || '', category: link?.category || '', url: link?.url || '', clientId: link?.clientId ?? modal.clientId })
+  const [form, setForm] = useState({ id: link?.id, label: link?.label || '', category: link?.category || '', url: link?.url || '', clientId: link?.clientId ?? modal.clientId, practice: link?.practice || '' })
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const practices = getPractices(clients.find((c) => c.id === form.clientId))
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: 24, width: 460, maxWidth: '95vw' }}>
@@ -266,6 +320,14 @@ function LinkModal({ modal, link, clients, onSave, onDelete, onClose }) {
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
+        {practices.length > 0 && (
+          <Field label="Practice / location">
+            <select style={inp} value={form.practice || ''} onChange={(e) => set('practice', e.target.value)}>
+              <option value="">— All locations —</option>
+              {practices.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
+        )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }}>
           {link && <button onClick={() => onDelete(link.id)} style={{ ...btnGhost, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)', marginRight: 'auto' }}>Delete</button>}
           <button onClick={onClose} style={btnGhost}>Cancel</button>
