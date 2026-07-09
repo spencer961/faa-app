@@ -22,6 +22,7 @@ const ENTRY_SECTIONS = [
   { label: 'Revenue & Marketing', desc: 'Dollars in, dollars spent, and your return', bg: '#FAEEDA', tc: '#633806', accent: '#633806', metrics: ['internal_revenue', 'marketing_revenue', 'marketing_spend'], calcs: ['total_revenue', 'cpl', 'cost_per_consult', 'cost_per_tx', 'roas'] },
 ]
 const M = (id) => METRICS.find((m) => m.id === id)
+const SEC_LABEL = { 'Lead Activity': 'Lead activity', 'Show Rate': 'Show rate', 'Closing': 'Closing', 'Revenue': 'Revenue', 'Marketing ROI': 'Marketing ROI' }
 const today = () => new Date().toISOString().split('T')[0]
 const shiftDate = (d, days) => { const dt = new Date(d + 'T12:00:00'); dt.setDate(dt.getDate() + days); return dt.toISOString().split('T')[0] }
 const fmtWeekLabel = (fri) => { const f = new Date(fri + 'T12:00:00'); const mon = new Date(f); mon.setDate(mon.getDate() - 4); const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); return fmt(mon) + ' – ' + fmt(f) }
@@ -199,62 +200,48 @@ function ClientView({ clients, data, setData }) {
       </div>
 
       {period === 'daily' ? (
-        <>
-          <div className="stat-grid">
-            {KEY_METRICS.map((id) => { const m = M(id); const v = aggregate(Object.values(data[cid]?.daily || {})); const val = v[id]; const bc = benchClass(m, val); return (
-              <div className="stat" key={id}><div className="stat-label">{m.label}</div><div className={'stat-val ' + bc}>{fmtVal(m, val, true)}</div><div className={'stat-bench ' + bc}>{m.benchLabel || 'All entries'}</div></div>
-            )})}
-          </div>
-          <div className="entry-card">
-            <div className="entry-bar">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button className="nav-btn" onClick={() => setDate(shiftDate(date, -1))} title="Previous day">‹</button>
-                <input type="date" className="slim" value={date} onChange={(e) => setDate(e.target.value)} />
-                <button className="nav-btn" onClick={() => !isToday && setDate(shiftDate(date, 1))} disabled={isToday} style={{ opacity: isToday ? 0.3 : 1 }} title="Next day">›</button>
-                {isToday && <span className="today-pill">Today</span>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className="progress-wrap" title={filled + ' of ' + totalInputs + ' fields entered'}>
-                  <div className="progress-bar"><div className="progress-fill" style={{ width: (filled / totalInputs * 100) + '%' }} /></div>
-                  <span className="progress-txt">{filled}/{totalInputs}</span>
-                </div>
-                <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save' : 'Saved ✓'}</button>
-              </div>
+        <div className="entry-card">
+          <div className="entry-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="nav-btn" onClick={() => setDate(shiftDate(date, -1))} title="Previous day">‹</button>
+              <input type="date" className="slim" value={date} onChange={(e) => setDate(e.target.value)} />
+              <button className="nav-btn" onClick={() => !isToday && setDate(shiftDate(date, 1))} disabled={isToday} style={{ opacity: isToday ? 0.3 : 1 }} title="Next day">›</button>
+              {isToday && <span className="today-pill">Today</span>}
             </div>
-            <div className="entry-sections">
-              {ENTRY_SECTIONS.map((sec) => (
-                <div className="entry-band" key={sec.label} style={{ borderLeftColor: sec.accent }}>
-                  <div className="band-head">
-                    <span className="band-tag" style={{ background: sec.bg, color: sec.tc }}>{sec.label}</span>
-                    <span className="band-desc">{sec.desc}</span>
-                  </div>
-                  <div className="field-grid">
-                    {sec.metrics.map((mid) => { const m = M(mid); const has = form[mid] !== '' && form[mid] !== undefined && form[mid] !== null; return (
-                      <div className={'field' + (has ? ' filled' : '')} key={mid}>
-                        <label>{m.label}</label>
-                        {m.hint && <span className="field-hint">{m.hint}</span>}
-                        <div className={'input-wrap' + (m.dollar ? ' dollar' : '')}>
-                          {m.dollar && <span className="dollar-sign">$</span>}
-                          <input className="metric-input" type="number" min="0" inputMode="decimal" value={form[mid] ?? ''} placeholder="0" onChange={(e) => setField(mid, e.target.value)} onFocus={(e) => e.target.select()} onKeyDown={onKey} />
-                        </div>
-                      </div>
-                    )})}
-                  </div>
-                  {sec.calcs.length > 0 && (
-                    <div className="calc-tiles">
-                      {sec.calcs.map((cid2) => { const m = M(cid2); const bc = m.bench ? benchClass(m, calcVals[cid2]) : 'neutral'; return (
-                        <div className={'calc-tile ' + bc} key={cid2}>
-                          <span className="calc-label">{m.label}</span>
-                          <span className="calc-value">{fmtVal(m, calcVals[cid2])}</span>
-                        </div>
-                      )})}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="progress-wrap" title={filled + ' of ' + totalInputs + ' fields entered'}>
+                <div className="progress-bar"><div className="progress-fill" style={{ width: (filled / totalInputs * 100) + '%' }} /></div>
+                <span className="progress-txt">{filled}/{totalInputs}</span>
+              </div>
+              <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save' : 'Saved ✓'}</button>
+            </div>
+          </div>
+          <div className="sheet-list">
+            {(() => {
+              let lastSec = null; const rows = []
+              METRICS.forEach((m) => {
+                if (m.section !== lastSec) { lastSec = m.section; rows.push(<div className="sheet-sec" key={'s_' + m.section}>{SEC_LABEL[m.section] || m.section}</div>) }
+                if (m.calc) {
+                  rows.push(
+                    <div className="sheet-row gold" key={m.id}>
+                      <span className="sheet-name">{m.label}<span className="auto-tag">auto</span></span>
+                      <span className="sheet-out">{fmtVal(m, calcVals[m.id])}</span>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                  )
+                } else {
+                  const has = form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null
+                  rows.push(
+                    <div className={'sheet-row' + (has ? ' filled' : '')} key={m.id}>
+                      <span className="sheet-name">{m.label}{m.hint && <span className="sheet-hint">{m.hint}</span>}</span>
+                      <span className="sheet-input-wrap">{m.dollar && <span className="ds">$</span>}<input className="metric-input sheet-input" type="number" min="0" inputMode="decimal" value={form[m.id] ?? ''} placeholder="0" onChange={(e) => setField(m.id, e.target.value)} onFocus={(e) => e.target.select()} onKeyDown={onKey} /></span>
+                    </div>
+                  )
+                }
+              })
+              return rows
+            })()}
           </div>
-        </>
+        </div>
       ) : (
         <AggView daily={data[cid]?.daily || {}} period={period} />
       )}
@@ -420,6 +407,21 @@ const CSS = `
 .mx .entry-bar{padding:12px 16px;border-bottom:0.5px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .mx .nav-btn{width:30px;height:30px;border:0.5px solid rgba(0,0,0,0.12);border-radius:6px;background:transparent;cursor:pointer;font-size:16px;line-height:1;color:#1a1a1a;}
 .mx .today-pill{padding:2px 10px;border-radius:10px;border:1.5px solid #bc9762;color:#bc9762;font-size:11px;font-weight:600;}
+.mx .sheet-list{padding:4px 0 8px;}
+.mx .sheet-sec{padding:13px 18px 5px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#a0a09e;}
+.mx .sheet-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 18px;border-bottom:0.5px solid rgba(0,0,0,0.05);}
+.mx .sheet-row.filled{background:#fbfcff;}
+.mx .sheet-row.gold{background:#FAEEDA;border-bottom-color:rgba(99,56,6,0.12);}
+.mx .sheet-name{font-size:13px;color:#1a1a1a;line-height:1.3;display:flex;flex-direction:column;}
+.mx .sheet-row.gold .sheet-name{flex-direction:row;align-items:center;gap:7px;color:#633806;}
+.mx .sheet-hint{font-size:11px;color:#a0a09e;line-height:1.3;margin-top:1px;}
+.mx .auto-tag{font-size:9px;text-transform:uppercase;letter-spacing:.03em;border:0.5px solid rgba(99,56,6,0.3);border-radius:4px;padding:1px 5px;color:#633806;flex-shrink:0;}
+.mx .sheet-out{font-size:15px;font-weight:600;color:#633806;font-variant-numeric:tabular-nums;min-width:56px;text-align:right;}
+.mx .sheet-input-wrap{display:flex;align-items:center;flex-shrink:0;}
+.mx .sheet-input-wrap .ds{color:#888786;font-size:14px;margin-right:2px;}
+.mx .sheet-input{width:92px;height:34px;border:0.5px solid rgba(0,0,0,0.12);border-radius:7px;background:#fff;text-align:right;font-size:16px;font-weight:600;color:#1a1a1a;padding:0 10px;font-variant-numeric:tabular-nums;}
+.mx .sheet-input:focus{border-color:#0b1d5e;outline:none;box-shadow:0 0 0 3px rgba(11,29,94,0.08);}
+.mx .sheet-input::placeholder{color:#cfcecb;font-weight:500;}
 .mx .progress-wrap{display:flex;align-items:center;gap:7px;}
 .mx .progress-bar{width:70px;height:6px;border-radius:3px;background:#eceae7;overflow:hidden;}
 .mx .progress-fill{height:100%;background:#0b1d5e;border-radius:3px;transition:width .3s;}
