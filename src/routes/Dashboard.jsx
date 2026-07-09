@@ -35,6 +35,7 @@ const abbrOf = (c) => {
   return words.map((w) => w[0].toUpperCase()).join('').slice(0, 6)
 }
 const money = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const websiteUrl = (v) => { const s = String(v || '').trim(); if (!s) return ''; return /^https?:\/\//i.test(s) ? s : 'https://' + s }
 const staffList = (info) => { let s = info?.staff; if (!s) return []; try { if (typeof s === 'string') s = JSON.parse(s) } catch { return [String(info.staff)] } return Array.isArray(s) ? s : [s] }
 
 // Practices/locations live at info.practices. Some older records nest the
@@ -270,6 +271,7 @@ export default function Dashboard() {
             const wk = clientWeekly(c.id)
             // Open that client's page scoped to them, in a new tab (dashboard stays put).
             const go = (e, path) => { e.stopPropagation(); window.open(window.location.href.split('#')[0] + '#' + path + '?client=' + c.id, '_blank') }
+            const web = websiteUrl(infoField(c, 'website'))
             return (
               <div key={c.id} onClick={() => setDetailId(c.id)} style={{ ...card, gridColumn: multi ? '1 / -1' : undefined }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -281,10 +283,17 @@ export default function Dashboard() {
                     </div>
                     {meta && <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{meta}</div>}
                   </div>
-                  {toggles.todos && openN > 0 && (
-                    <span onClick={(e) => go(e, '/tasks')} title="Open to-dos" style={{ flexShrink: 0, background: 'rgba(188,151,98,0.15)', color: '#8a6a3c', border: '0.5px solid rgba(188,151,98,0.4)', borderRadius: 999, fontSize: 11, fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>{openN} to-do{openN !== 1 ? 's' : ''}</span>
+                  {web && (
+                    <button onClick={(e) => { e.stopPropagation(); window.open(web, '_blank') }} title="Open website" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, border: '0.5px solid rgba(0,0,0,0.12)', background: BG, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: NAVY }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                    </button>
                   )}
                 </div>
+                {toggles.todos && openN > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <span onClick={(e) => go(e, '/tasks')} title="Open to-dos" style={{ display: 'inline-block', background: 'rgba(188,151,98,0.15)', color: '#8a6a3c', border: '0.5px solid rgba(188,151,98,0.4)', borderRadius: 999, fontSize: 11, fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>{openN} to-do{openN !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
                 {getTiers(c).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
                     {getTiers(c).map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <span key={id} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: t.color + '1a', color: t.color, border: '0.5px solid ' + t.color + '55' }}>{t.name}</span> })}
@@ -442,7 +451,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           {INFO_FIELDS.map(([k, label]) => (
-            <InfoCard key={k} label={label} value={infoField(c, k) || (k === 'doctor' ? c.doctor : '')} />
+            <InfoCard key={k} label={label} value={infoField(c, k) || (k === 'doctor' ? c.doctor : '')} href={k === 'website' && infoField(c, 'website') ? websiteUrl(infoField(c, 'website')) : undefined} />
           ))}
           <InfoCard label="Staff / team" value={staff.length ? staff.map((s) => (typeof s === 'object' ? [s.name, s.role].filter(Boolean).join(' — ') : s)).join('\n') : ''} />
         </div>
@@ -510,11 +519,13 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   )
 }
 
-function InfoCard({ label, value }) {
+function InfoCard({ label, value, href }) {
   return (
     <div style={{ background: '#fff', borderRadius: 8, padding: '12px 14px', border: '0.5px solid rgba(0,0,0,0.08)' }}>
       <div style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 13, color: value ? TEXT : '#c0c6d8', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontStyle: value ? 'normal' : 'italic' }}>{value || 'Not set'}</div>
+      {href && value
+        ? <a href={href} target="_blank" rel="noopener" style={{ fontSize: 13, color: NAVY, lineHeight: 1.6, wordBreak: 'break-all', textDecoration: 'none', fontWeight: 500 }}>{value} ↗</a>
+        : <div style={{ fontSize: 13, color: value ? TEXT : '#c0c6d8', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontStyle: value ? 'normal' : 'italic' }}>{value || 'Not set'}</div>}
     </div>
   )
 }
