@@ -170,6 +170,7 @@ export default function Dashboard() {
   const savePayment = (clientId, payment) => { const c = clients.find((x) => x.id === clientId); patchInfo(clientId, { payments: [...(c?.info?.payments || []), payment] }) }
   const deletePayment = (clientId, p) => { const c = clients.find((x) => x.id === clientId); patchInfo(clientId, { payments: (c?.info?.payments || []).filter((x) => !(x.recorded === p.recorded && x.date === p.date && x.amount === p.amount)) }) }
   const saveBilling = (clientId, billing) => patchInfo(clientId, { billing })
+  const editPayment = (clientId, oldP, newFields) => { const c = clients.find((x) => x.id === clientId); patchInfo(clientId, { payments: (c?.info?.payments || []).map((x) => (x.recorded === oldP.recorded && x.date === oldP.date && x.amount === oldP.amount ? { ...x, ...newFields } : x)) }) }
 
   async function addClient(form) {
     if (!form.name.trim()) return
@@ -225,7 +226,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -337,7 +338,7 @@ export default function Dashboard() {
                     {practices.map((p) => <button key={p} onClick={() => setCardPractice((m) => ({ ...m, [c.id]: p }))} style={cardTab(activePrac === p)}>{p}</button>)}
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
                   {cvis.length === 0 && <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic', padding: '2px 0' }}>{activePrac ? 'No files for this location' : 'No files yet'}</div>}
                   <div style={cvis.length > 7 ? { display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 236, overflowY: 'auto' } : { display: 'contents' }}>
                     {cvis.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
@@ -426,12 +427,13 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, canUndo, onUndo, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
   const [newTier, setNewTier] = useState('')
   const [editOpen, setEditOpen] = useState(false)
+  const [billingModal, setBillingModal] = useState(null)
   const info = c.info || {}
   const practices = getPractices(c)
   const staffObjs = parseStaff(c)
@@ -486,11 +488,18 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             </div>
           </div>
           <div style={sectionCard}>
-            <SectionTitle>Billing</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, fontSize: 13, color: TEXT }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1.5px solid ' + GOLD, paddingBottom: 6, marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: TEXT }}>Billing</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setBillingModal({ type: 'history' })} style={miniBtn}>History</button>
+                <button onClick={() => setBillingModal({ type: 'billing' })} style={miniBtn}>Settings</button>
+                <button onClick={() => setBillingModal({ type: 'record' })} style={miniBtnP}>+ Payment</button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: TEXT }}>
               {billing.monthlyAmount ? <div><span style={{ color: MUTED }}>Monthly: </span>{money(billing.monthlyAmount)}</div> : <div style={{ color: MUTED, fontStyle: 'italic' }}>No billing set yet.</div>}
               {billing.billingDay && <div><span style={{ color: MUTED }}>Bills on the {billing.billingDay} of each month</span></div>}
-              {lastPay && <div><span style={{ color: MUTED }}>Last payment: </span>{money(lastPay.amount)} — {lastPay.fmt || lastPay.date}</div>}
+              {lastPay ? <div><span style={{ color: MUTED }}>Last payment: </span>{money(lastPay.amount)} — {lastPay.fmt || lastPay.date}</div> : <div style={{ color: MUTED, fontStyle: 'italic' }}>No payments yet.</div>}
             </div>
           </div>
         </div>
@@ -539,6 +548,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
       </div>
       {linkEdit && <LinkModal modal={linkEdit} link={linkEdit.id ? links.find((l) => l.id === linkEdit.id) : null} clients={clients} onSave={(f) => { onSaveLink(f); setLinkEdit(null) }} onDelete={(id) => { onDeleteLink(id); setLinkEdit(null) }} onClose={() => setLinkEdit(null)} />}
       {editOpen && <EditClientModal client={c} onSave={(f) => { onSaveClient(c.id, f); setEditOpen(false) }} onDelete={() => onDeleteClient(c.id)} onClose={() => setEditOpen(false)} />}
+      {billingModal && <AccountingModal modal={{ ...billingModal, clientId: c.id }} client={c} onClose={() => setBillingModal(null)} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} onSaveBilling={onSaveBilling} onEditPayment={onEditPayment} />}
       {toast && <Toast msg={toast} />}
     </div>
   )
@@ -614,7 +624,7 @@ function LinkModal({ modal, link, clients, onSave, onDelete, onClose }) {
   )
 }
 
-function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePayment, onSaveBilling }) {
+function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment }) {
   const payments = Array.isArray(client?.info?.payments) ? [...client.info.payments].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : []
   const billing = client?.info?.billing || client?.billing || {}
   const [amount, setAmount] = useState('')
@@ -623,6 +633,8 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
   const [monthly, setMonthly] = useState(billing.monthlyAmount || '')
   const [billingDay, setBillingDay] = useState(billing.billingDay || '')
   const [confirmPay, setConfirmPay] = useState(null)
+  const [editRow, setEditRow] = useState(null)
+  const [ea, setEa] = useState({})
   const total = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
   const byMonth = {}
   payments.forEach((p) => { const k = (p.date || '').slice(0, 7); if (k) byMonth[k] = (byMonth[k] || 0) + (parseFloat(p.amount) || 0) })
@@ -667,16 +679,33 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
           <div style={{ maxHeight: 280, overflowY: 'auto' }}>
             {payments.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic', padding: '12px 0' }}>No payments recorded yet.</div>}
             {payments.map((p, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
-                <div><div style={{ fontSize: 13, fontWeight: 500, color: TEXT }}>{money(p.amount)}</div><div style={{ fontSize: 11, color: MUTED }}>{p.fmt || p.date}{p.note ? ' · ' + p.note : ''}</div></div>
-                {confirmPay === i ? (
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: '#A32D2D' }}>Delete?</span>
-                    <button onClick={() => setConfirmPay(null)} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 12 }}>No</button>
-                    <button onClick={() => { onDeletePayment(client.id, p); setConfirmPay(null) }} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Yes</button>
-                  </span>
+              <div key={i} style={{ padding: '8px 0', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
+                {editRow === i ? (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input style={{ ...inp, width: 90 }} type="number" value={ea.amount} onChange={(e) => setEa((x) => ({ ...x, amount: e.target.value }))} />
+                    <input style={{ ...inp, width: 140 }} type="date" value={ea.date} onChange={(e) => setEa((x) => ({ ...x, date: e.target.value }))} />
+                    <input style={{ ...inp, flex: 1, minWidth: 80 }} value={ea.note} placeholder="Note" onChange={(e) => setEa((x) => ({ ...x, note: e.target.value }))} />
+                    <button onClick={() => setEditRow(null)} style={{ ...btnGhost, height: 30 }}>Cancel</button>
+                    <button onClick={() => { onEditPayment(client.id, p, { amount: parseFloat(ea.amount) || 0, date: ea.date, fmt: new Date(ea.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), note: ea.note || null }); setEditRow(null) }} style={{ ...btnPrimary, height: 30 }}>Save</button>
+                  </div>
                 ) : (
-                  <button onClick={() => setConfirmPay(i)} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12 }}>Delete</button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div><div style={{ fontSize: 13, fontWeight: 500, color: TEXT }}>{money(p.amount)}</div><div style={{ fontSize: 11, color: MUTED }}>{p.fmt || p.date}{p.note ? ' · ' + p.note : ''}</div></div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      {confirmPay === i ? (
+                        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: '#A32D2D' }}>Delete?</span>
+                          <button onClick={() => setConfirmPay(null)} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 12 }}>No</button>
+                          <button onClick={() => { onDeletePayment(client.id, p); setConfirmPay(null) }} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Yes</button>
+                        </span>
+                      ) : (
+                        <>
+                          <button onClick={() => { setEditRow(i); setEa({ amount: p.amount, date: p.date, note: p.note || '' }) }} style={{ background: 'none', border: 'none', color: NAVY, cursor: 'pointer', fontSize: 12 }}>Edit</button>
+                          <button onClick={() => setConfirmPay(i)} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12 }}>Delete</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
