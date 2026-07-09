@@ -200,7 +200,7 @@ function ClientView({ clients, data, setData }) {
       </div>
 
       {period === 'daily' ? (
-        <div className="entry-card">
+        <div className="entry-card narrow">
           <div className="entry-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button className="nav-btn" onClick={() => setDate(shiftDate(date, -1))} title="Previous day">‹</button>
@@ -216,22 +216,23 @@ function ClientView({ clients, data, setData }) {
               <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save' : 'Saved ✓'}</button>
             </div>
           </div>
+          <div className="sheet-tip">Tip: press <kbd>Tab</kbd> to jump to the next field.</div>
           <div className="sheet-list">
             {(() => {
-              let lastSec = null; const rows = []
+              let lastSec = null; let ii = 0; const rows = []
               METRICS.forEach((m) => {
-                if (m.section !== lastSec) { lastSec = m.section; rows.push(<div className="sheet-sec" key={'s_' + m.section}>{SEC_LABEL[m.section] || m.section}</div>) }
+                if (m.section !== lastSec) { lastSec = m.section; ii = 0; rows.push(<div className="sheet-sec" key={'s_' + m.section}>{SEC_LABEL[m.section] || m.section}</div>) }
                 if (m.calc) {
                   rows.push(
                     <div className="sheet-row gold" key={m.id}>
-                      <span className="sheet-name">{m.label}<span className="auto-tag">auto</span></span>
+                      <span className="sheet-name">{m.label}</span>
                       <span className="sheet-out">{fmtVal(m, calcVals[m.id])}</span>
                     </div>
                   )
                 } else {
-                  const has = form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null
+                  const alt = ii % 2 === 1; ii++
                   rows.push(
-                    <div className={'sheet-row' + (has ? ' filled' : '')} key={m.id}>
+                    <div className={'sheet-row' + (alt ? ' alt' : '')} key={m.id}>
                       <span className="sheet-name">{m.label}{m.hint && <span className="sheet-hint">{m.hint}</span>}</span>
                       <span className="sheet-input-wrap">{m.dollar && <span className="ds">$</span>}<input className="metric-input sheet-input" type="number" min="0" inputMode="decimal" value={form[m.id] ?? ''} placeholder="0" onChange={(e) => setField(m.id, e.target.value)} onFocus={(e) => e.target.select()} onKeyDown={onKey} /></span>
                     </div>
@@ -320,7 +321,7 @@ function MonthGrid({ cid, clients, data, setData }) {
     if (m.section !== lastSec) { lastSec = m.section; bodyRows.push(<tr key={'sec_' + m.section} className="gt-sec"><td colSpan={days.length + 1}>{SEC_LABEL[m.section] || m.section}</td></tr>) }
     bodyRows.push(
       <tr key={m.id} className={m.calc ? 'gt-gold' : ''}>
-        <td className="gt-name" title={m.hint || ''}>{m.label}{m.calc && <span className="auto-tag">auto</span>}</td>
+        <td className="gt-name" title={m.hint || ''}>{m.label}</td>
         {days.map((dk, di) => m.calc
           ? <td key={dk} className="gt-cell gt-out">{fmtVal(m, m.calc(grid[dk] || {}))}</td>
           : <td key={dk} className="gt-cell"><input className="gt-input" type="number" value={grid[dk]?.[m.id] ?? ''} onChange={(e) => setCell(dk, m.id, e.target.value)} onPaste={(e) => onPaste(e, mi, di)} onFocus={(e) => e.target.select()} /></td>
@@ -508,15 +509,17 @@ const CSS = `
 .mx .entry-bar{padding:12px 16px;border-bottom:0.5px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .mx .nav-btn{width:30px;height:30px;border:0.5px solid rgba(0,0,0,0.12);border-radius:6px;background:transparent;cursor:pointer;font-size:16px;line-height:1;color:#1a1a1a;}
 .mx .today-pill{padding:2px 10px;border-radius:10px;border:1.5px solid #bc9762;color:#bc9762;font-size:11px;font-weight:600;}
-.mx .sheet-list{padding:4px 0 8px;}
-.mx .sheet-sec{padding:13px 18px 5px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#a0a09e;}
-.mx .sheet-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 18px;border-bottom:0.5px solid rgba(0,0,0,0.05);}
-.mx .sheet-row.filled{background:#fbfcff;}
-.mx .sheet-row.gold{background:#FAEEDA;border-bottom-color:rgba(99,56,6,0.12);}
+.mx .entry-card.narrow{max-width:480px;margin:0 auto;}
+.mx .sheet-tip{padding:8px 16px;font-size:11px;color:#888786;background:#f9f9f8;border-bottom:0.5px solid rgba(0,0,0,0.06);}
+.mx .sheet-tip kbd{font-family:inherit;font-size:10px;background:#fff;border:0.5px solid rgba(0,0,0,0.2);border-radius:4px;padding:1px 5px;color:#1a1a1a;}
+.mx .sheet-list{padding:0 0 6px;}
+.mx .sheet-sec{padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#7c7b78;background:#eeece8;border-bottom:0.5px solid rgba(0,0,0,0.05);}
+.mx .sheet-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 16px;background:#fff;}
+.mx .sheet-row.alt{background:#f6f5f3;}
+.mx .sheet-row.gold{background:#FAEEDA;}
 .mx .sheet-name{font-size:13px;color:#1a1a1a;line-height:1.3;display:flex;flex-direction:column;}
 .mx .sheet-row.gold .sheet-name{flex-direction:row;align-items:center;gap:7px;color:#633806;}
 .mx .sheet-hint{font-size:11px;color:#a0a09e;line-height:1.3;margin-top:1px;}
-.mx .auto-tag{font-size:9px;text-transform:uppercase;letter-spacing:.03em;border:0.5px solid rgba(99,56,6,0.3);border-radius:4px;padding:1px 5px;color:#633806;flex-shrink:0;}
 .mx .sheet-out{font-size:15px;font-weight:600;color:#633806;font-variant-numeric:tabular-nums;min-width:56px;text-align:right;}
 .mx .sheet-input-wrap{display:flex;align-items:center;flex-shrink:0;}
 .mx .sheet-input-wrap .ds{color:#888786;font-size:14px;margin-right:2px;}
@@ -529,7 +532,6 @@ const CSS = `
 .mx .grid-table th,.mx .grid-table td{border-bottom:0.5px solid rgba(0,0,0,0.06);border-right:0.5px solid rgba(0,0,0,0.05);}
 .mx .gt-name-h,.mx .gt-name{position:sticky;left:0;z-index:2;background:#fff;text-align:left;min-width:210px;max-width:210px;padding:7px 12px;font-size:12px;color:#1a1a1a;}
 .mx .gt-name-h{z-index:3;background:#f9f9f8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#888786;}
-.mx .gt-name .auto-tag{margin-left:6px;}
 .mx .gt-day-h{min-width:64px;padding:7px 6px;font-size:11px;font-weight:600;color:#888786;background:#f9f9f8;text-align:center;white-space:nowrap;position:sticky;top:0;}
 .mx .gt-cell{padding:0;text-align:center;height:34px;}
 .mx .gt-input{width:64px;height:33px;border:none;background:transparent;text-align:center;font-size:13px;color:#1a1a1a;padding:0 4px;font-variant-numeric:tabular-nums;}
