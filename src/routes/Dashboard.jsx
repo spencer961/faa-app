@@ -38,6 +38,21 @@ const PRACTICE_PALETTE = [
   { bg: '#FDEEF6', txt: '#8C1A5A' }, { bg: '#F0EDFB', txt: '#5A3DAA' }, { bg: '#EAF3DE', txt: '#274F0A' },
 ]
 const practiceColor = (name) => { let h = 0; for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return PRACTICE_PALETTE[h % PRACTICE_PALETTE.length] }
+// Location tabs exclude a practice that just repeats the client's own name —
+// "All" already covers it (e.g. "4M Dental Implant Center").
+const tabPractices = (c) => getPractices(c).filter((p) => p !== c.name)
+
+// Billing status for the accounting panel.
+const billingStatus = (billing, lastPay) => {
+  const day = billing?.billingDay ? parseInt(billing.billingDay) : null
+  if (!day) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due = new Date(today.getFullYear(), today.getMonth(), day)
+  const lastPayDate = lastPay?.date ? new Date(lastPay.date + 'T12:00:00') : null
+  if (lastPayDate && lastPayDate >= due) return { label: '✓ Paid this cycle', color: '#3B6D11' }
+  if (today > due) { const d = Math.floor((today - due) / 86400000); return { label: `⚠ ${d} day${d !== 1 ? 's' : ''} past due`, color: '#A32D2D' } }
+  const d = Math.floor((due - today) / 86400000); return { label: `Due in ${d} day${d !== 1 ? 's' : ''}`, color: MUTED }
+}
 
 const INFO_FIELDS = [
   ['doctor', 'Doctor / primary contact'], ['timezone', 'Time zone'], ['website', 'Website'],
@@ -55,9 +70,10 @@ export default function Dashboard() {
   const [toast, setToast] = useState('')
   const [tasks, setTasks] = useState([])
   const [cardPractice, setCardPractice] = useState({}) // {clientId: activePracticeName}
+  const [accModal, setAccModal] = useState(null) // {type:'record'|'history'|'billing', clientId}
   const [metricsByClient, setMetricsByClient] = useState({})
   const [snaps] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } })
-  const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true } } })
+  const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, accounting: false, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true, accounting: false } } })
   const navigate = useNavigate()
   const toggleLayer = (k) => setToggles((t) => { const n = { ...t, [k]: !t[k] }; try { localStorage.setItem('faa_dash_toggles', JSON.stringify(n)) } catch { /* ignore */ } return n })
 
@@ -111,6 +127,19 @@ export default function Dashboard() {
     showToast('Practices updated ✓')
   }
 
+  // Merge a patch into a client's info record (used by accounting).
+  async function patchInfo(clientId, patch) {
+    const c = clients.find((x) => x.id === clientId)
+    if (!c) return
+    const info = { ...(c.info || {}), ...patch }
+    setClients((cs) => cs.map((x) => (x.id === clientId ? { ...x, info } : x)))
+    await supabase.from('clients').update({ info, updated_at: new Date().toISOString() }).eq('id', clientId)
+    showToast('Saved ✓')
+  }
+  const savePayment = (clientId, payment) => { const c = clients.find((x) => x.id === clientId); patchInfo(clientId, { payments: [...(c?.info?.payments || []), payment] }) }
+  const deletePayment = (clientId, p) => { const c = clients.find((x) => x.id === clientId); patchInfo(clientId, { payments: (c?.info?.payments || []).filter((x) => !(x.recorded === p.recorded && x.date === p.date && x.amount === p.amount)) }) }
+  const saveBilling = (clientId, billing) => patchInfo(clientId, { billing })
+
   const M = (id) => METRICS.find((m) => m.id === id)
   const openTasks = (cid) => tasks.filter((t) => t.client_id === cid && t.status !== 'done').length
   const clientHealth = (cid) => { const s = snaps[cid] || []; if (!s.length) return null; const latest = [...s].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-1)[0]; return health(latest.scores) }
@@ -133,7 +162,7 @@ export default function Dashboard() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Show on cards</span>
-          {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics']].map(([k, label]) => (
+          {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].map(([k, label]) => (
             <button key={k} onClick={() => toggleLayer(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, border: '0.5px solid ' + (toggles[k] ? NAVY : 'rgba(0,0,0,0.15)'), background: toggles[k] ? 'rgba(11,29,94,0.05)' : '#fff', color: toggles[k] ? NAVY : MUTED, fontSize: 12, cursor: 'pointer' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
             </button>
@@ -145,9 +174,10 @@ export default function Dashboard() {
             const cl = links.filter((l) => l.clientId === c.id)
             const accent = c.info?.accentColor || c.accentColor || GOLD
             const meta = [infoField(c, 'doctor') || c.doctor, infoField(c, 'timezone') ? infoField(c, 'timezone').split('—')[0].trim() : ''].filter(Boolean).join(' · ')
-            const practices = getPractices(c)
+            const practices = tabPractices(c)
             const activePrac = cardPractice[c.id] || null
-            const cvis = cl.filter((l) => !activePrac || !l.practice || l.practice === activePrac)
+            // A link tagged with the client's own name is "shared" — it shows under every location tab.
+            const cvis = cl.filter((l) => !activePrac || !l.practice || l.practice === activePrac || l.practice === c.name)
             const openN = openTasks(c.id)
             const hp = clientHealth(c.id)
             const wk = clientWeekly(c.id)
@@ -170,11 +200,11 @@ export default function Dashboard() {
                 {toggles.progress && (
                   <div onClick={(e) => go(e, '/success-map')} style={{ marginBottom: 10, cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-                      <span style={{ color: MUTED }}>Success Map</span>
-                      <span style={{ color: hp === null ? MUTED : hp >= 70 ? '#18a866' : hp >= 40 ? '#e07b0a' : '#d42020', fontWeight: 600 }}>{hp === null ? 'Not assessed' : hp + '%'}</span>
+                      <span style={{ color: MUTED }}>Progress</span>
+                      <span style={{ color: hp === null ? MUTED : GOLD, fontWeight: 600 }}>{hp === null ? 'Not assessed' : hp + '%'}</span>
                     </div>
                     <div style={{ height: 6, background: '#eceae7', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: (hp || 0) + '%', background: hp === null ? 'transparent' : hp >= 70 ? '#18a866' : hp >= 40 ? '#e07b0a' : '#d42020', borderRadius: 3, transition: 'width .4s' }} />
+                      <div style={{ height: '100%', width: (hp || 0) + '%', background: hp === null ? 'transparent' : GOLD, borderRadius: 3, transition: 'width .4s' }} />
                     </div>
                   </div>
                 )}
@@ -196,27 +226,50 @@ export default function Dashboard() {
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {cvis.length === 0 && <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic', padding: '2px 0' }}>{activePrac ? 'No files for this location' : 'No files yet'}</div>}
-                  {cvis.map((l) => <LinkChip key={l.id} l={l} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
+                  {cvis.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
                   {editMode && <button onClick={(e) => { e.stopPropagation(); setLinkModal({ clientId: c.id, practice: activePrac || '' }) }} style={addRow}>+ Add link</button>}
                 </div>
+                {toggles.accounting && (() => {
+                  const billing = c.info?.billing || c.billing || {}
+                  const payments = Array.isArray(c.info?.payments) ? c.info.payments : []
+                  const lastPay = [...payments].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]
+                  const due = billingStatus(billing, lastPay)
+                  return (
+                    <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 12, paddingTop: 10, borderTop: '0.5px solid rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em' }}>Last payment{billing.monthlyAmount ? ' · ' + money(billing.monthlyAmount) + '/mo' : ''}</div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: TEXT, marginTop: 2 }}>{lastPay ? money(lastPay.amount) + ' — ' + (lastPay.fmt || lastPay.date) : <span style={{ color: MUTED, fontStyle: 'italic', fontWeight: 400 }}>No payments yet</span>}</div>
+                        {due && <div style={{ fontSize: 11, color: due.color, marginTop: 3, fontWeight: 500 }}>{due.label}</div>}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: 5 }}>
+                          <button onClick={() => setAccModal({ type: 'history', clientId: c.id })} style={miniBtn}>History</button>
+                          <button onClick={() => setAccModal({ type: 'record', clientId: c.id })} style={miniBtnP}>+ Payment</button>
+                        </div>
+                        <button onClick={() => setAccModal({ type: 'billing', clientId: c.id })} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Billing settings</button>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             )
           })}
         </div>
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
+      {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
       {toast && <Toast msg={toast} />}
     </div>
   )
 }
 
-function LinkChip({ l, editMode, onEdit, onDelete }) {
+function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   const cc = catColor(l.category)
   return (
     <div onClick={(e) => { e.stopPropagation(); if (l.url) window.open(l.url, '_blank'); else onEdit(e) }} title={l.url || 'No URL yet — click to add'}
       style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '4px solid ' + cc.border, borderRadius: 8, background: BG, fontSize: 12, cursor: 'pointer' }}>
       <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: l.url ? TEXT : MUTED }}>{l.label}</span>
-      {l.practice && (() => { const pc = practiceColor(l.practice); return <span style={{ fontSize: 10, color: pc.txt, background: pc.bg, borderRadius: 3, padding: '1px 6px', flexShrink: 0, fontWeight: 500 }}>{l.practice}</span> })()}
+      {l.practice && l.practice !== clientName && (() => { const pc = practiceColor(l.practice); return <span style={{ fontSize: 10, color: pc.txt, background: pc.bg, borderRadius: 3, padding: '1px 6px', flexShrink: 0, fontWeight: 500 }}>{l.practice}</span> })()}
       {l.category && <span style={{ fontSize: 10, color: cc.txt, background: cc.bg, borderRadius: 3, padding: '1px 6px', flexShrink: 0 }}>{l.category}</span>}
       {!l.url && <span style={{ fontSize: 10, color: MUTED, fontStyle: 'italic' }}>no url</span>}
       {editMode && <>
@@ -238,7 +291,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const payments = Array.isArray(info.payments) ? [...info.payments].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : []
   const lastPay = payments[0]
   const accent = info.accentColor || c.accentColor || GOLD
-  const shownLinks = links.filter((l) => !pracFilter || !l.practice || l.practice === pracFilter)
+  const shownLinks = links.filter((l) => !pracFilter || !l.practice || l.practice === pracFilter || l.practice === c.name)
   const addPractice = () => { const v = newPrac.trim(); if (!v || practices.includes(v)) return; onSavePractices(c.id, [...practices, v]); setNewPrac('') }
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
@@ -287,15 +340,15 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <SectionTitle>Links & files ({shownLinks.length})</SectionTitle>
             <button onClick={() => setLinkEdit({ clientId: c.id })} style={{ ...addRow, width: 'auto', padding: '5px 12px' }}>+ Add link</button>
           </div>
-          {practices.length > 0 && (
+          {tabPractices(c).length > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
               <button onClick={() => setPracFilter(null)} style={pill(pracFilter === null)}>All</button>
-              {practices.map((p) => <button key={p} onClick={() => setPracFilter(p)} style={pill(pracFilter === p)}>{p}</button>)}
+              {tabPractices(c).map((p) => <button key={p} onClick={() => setPracFilter(p)} style={pill(pracFilter === p)}>{p}</button>)}
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {shownLinks.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No links yet.</div>}
-            {shownLinks.map((l) => <LinkChip key={l.id} l={l} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => onDeleteLink(l.id)} />)}
+            {shownLinks.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => onDeleteLink(l.id)} />)}
           </div>
         </div>
       </div>
@@ -348,12 +401,85 @@ function LinkModal({ modal, link, clients, onSave, onDelete, onClose }) {
   )
 }
 
+function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePayment, onSaveBilling }) {
+  const payments = Array.isArray(client?.info?.payments) ? [...client.info.payments].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : []
+  const billing = client?.info?.billing || client?.billing || {}
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [note, setNote] = useState('')
+  const [monthly, setMonthly] = useState(billing.monthlyAmount || '')
+  const [billingDay, setBillingDay] = useState(billing.billingDay || '')
+  const total = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
+  const byMonth = {}
+  payments.forEach((p) => { const k = (p.date || '').slice(0, 7); if (k) byMonth[k] = (byMonth[k] || 0) + (parseFloat(p.amount) || 0) })
+  const months = Object.keys(byMonth).sort().slice(-12)
+  const maxM = Math.max(1, ...months.map((m) => byMonth[m]))
+  const title = modal.type === 'record' ? 'Record payment' : modal.type === 'billing' ? 'Billing settings' : 'Payment history — ' + (client?.name || '')
+  return (
+    <div onClick={onClose} style={overlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: modal.type === 'history' ? 560 : 420 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY, marginBottom: 16 }}>{title}</h3>
+        {modal.type === 'record' && (<>
+          <Field label="Amount *"><input style={inp} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus /></Field>
+          <Field label="Date"><input style={inp} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Note"><input style={inp} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></Field>
+          <div style={modalActions}>
+            <button style={btnGhost} onClick={onClose}>Cancel</button>
+            <button style={btnPrimary} onClick={() => { if (!amount) return; onSavePayment(client.id, { amount: parseFloat(amount), date, fmt: new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), note: note || null, recorded: new Date().toISOString() }); onClose() }}>Save payment</button>
+          </div>
+        </>)}
+        {modal.type === 'billing' && (<>
+          <Field label="Monthly amount"><input style={inp} type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="5000" autoFocus /></Field>
+          <Field label="Bills on day of month (1–31)"><input style={inp} type="number" min="1" max="31" value={billingDay} onChange={(e) => setBillingDay(e.target.value)} placeholder="1" /></Field>
+          <div style={modalActions}>
+            <button style={btnGhost} onClick={onClose}>Cancel</button>
+            <button style={btnPrimary} onClick={() => { onSaveBilling(client.id, { monthlyAmount: monthly ? parseFloat(monthly) : null, billingDay: billingDay ? parseInt(billingDay) : null }); onClose() }}>Save</button>
+          </div>
+        </>)}
+        {modal.type === 'history' && (<>
+          {months.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Monthly totals</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 62 }}>
+                {months.map((m) => (
+                  <div key={m} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }} title={m + ': ' + money(byMonth[m])}>
+                    <div style={{ width: '100%', height: Math.round(byMonth[m] / maxM * 46) + 4, background: NAVY, borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ fontSize: 8, color: MUTED, whiteSpace: 'nowrap' }}>{m.slice(5)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            {payments.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic', padding: '12px 0' }}>No payments recorded yet.</div>}
+            {payments.map((p, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
+                <div><div style={{ fontSize: 13, fontWeight: 500, color: TEXT }}>{money(p.amount)}</div><div style={{ fontSize: 11, color: MUTED }}>{p.fmt || p.date}{p.note ? ' · ' + p.note : ''}</div></div>
+                <button onClick={() => onDeletePayment(client.id, p)} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12 }}>Delete</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '0.5px solid rgba(0,0,0,0.1)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT }}>Total: {money(total)}</span>
+            <button style={btnGhost} onClick={onClose}>Close</button>
+          </div>
+        </>)}
+      </div>
+    </div>
+  )
+}
+
 const Field = ({ label, children }) => <div style={{ marginBottom: 12 }}><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, marginBottom: 5 }}>{label}</div>{children}</div>
 const SectionTitle = ({ children }) => <div style={{ fontSize: 14, fontWeight: 500, color: TEXT, borderBottom: '1.5px solid ' + GOLD, paddingBottom: 6 }}>{children}</div>
 const Toast = ({ msg }) => <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: NAVY, color: '#fff', fontSize: 12, padding: '8px 18px', borderRadius: 20, zIndex: 9999 }}>{msg}</div>
 
 const pill = (active) => ({ padding: '5px 14px', border: '0.5px solid ' + (active ? GOLD : 'rgba(0,0,0,0.15)'), borderRadius: 999, background: active ? NAVY : '#fff', color: active ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer' })
 const cardTab = (active) => ({ padding: '3px 9px', borderRadius: 6, border: '0.5px solid ' + (active ? NAVY : 'rgba(0,0,0,0.12)'), background: active ? NAVY : '#fff', color: active ? '#fff' : MUTED, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' })
+const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }
+const modalBox = { background: '#fff', borderRadius: 14, padding: 24, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }
+const modalActions = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }
+const miniBtn = { height: 26, padding: '0 9px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 6, background: '#fff', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }
+const miniBtnP = { height: 26, padding: '0 9px', border: 'none', borderRadius: 6, background: NAVY, color: GOLD, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }
 const card = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '16px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column' }
 const sectionCard = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '18px 20px' }
 const addRow = { display: 'flex', alignItems: 'center', gap: 5, padding: '6px 9px', border: '0.5px dashed rgba(0,0,0,0.2)', borderRadius: 8, color: MUTED, fontSize: 12, cursor: 'pointer', background: 'none', width: '100%', fontFamily: 'inherit' }
