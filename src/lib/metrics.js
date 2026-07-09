@@ -9,34 +9,34 @@ export function pct(a, b) { const av = parseFloat(a), bv = parseFloat(b); if (!a
 export function add(a, b) { const av = parseFloat(a) || 0, bv = parseFloat(b) || 0; return av + bv || null }
 export function divide(a, b) { const av = parseFloat(a), bv = parseFloat(b); if (!av || !bv || bv === 0) return null; return Math.round(av / bv) }
 
-// The metric list — order matches the original spreadsheet exactly.
-// `label` is the full/official name; `short` is the friendly name shown on the
-// entry form, with `label` kept underneath as the clarifying helper line.
+// The metric list — labels match the client's spreadsheet EXACTLY (column B).
+// `label` is the official row name; `hint` holds the clarifier note the sheet
+// shows beneath a name, displayed as a small helper line on the entry form.
 export const METRICS = [
-  { id: 'leads', label: 'Lead Contact Attempts', short: 'Leads worked', section: 'Lead Activity', resp: '', hint: 'Total leads you contacted or worked' },
-  { id: 'lead_phone_convos', label: 'Lead Phone Conversations', short: 'Phone conversations', section: 'Lead Activity', resp: '' },
-  { id: 'consults_scheduled', label: 'Consults Scheduled (regardless of when)', short: 'Consults scheduled', section: 'Lead Activity', resp: '', hint: 'Booked regardless of the appointment date' },
-  { id: 'booking_rate', label: 'Lead Schedule Rate', short: 'Booking rate', section: 'Lead Activity', calc: (d) => pct(d.consults_scheduled, d.leads), bench: { low: 15, high: 30 }, benchLabel: 'Benchmark: 15–30%' },
-  { id: 'rescheduled', label: 'Rescheduled to a different day', short: 'Rescheduled', section: 'Lead Activity', resp: '' },
-  { id: 'cancelled', label: 'Cancellations', short: 'Cancellations', section: 'Lead Activity', resp: '' },
-  { id: 'consults_on_schedule', label: 'Consults on the Schedule (from marketing)', short: 'Consults on schedule', section: 'Show Rate', resp: '', hint: 'From marketing' },
-  { id: 'presented_treatment', label: 'Presented Treatment (Held Consultations from marketing)', short: 'Presented treatment', section: 'Show Rate', resp: '', hint: 'Held consultations from marketing' },
-  { id: 'show_rate', label: 'Consult Show Rate', short: 'Show rate', section: 'Show Rate', calc: (d) => pct(d.presented_treatment, d.consults_on_schedule), bench: { low: 60 }, benchLabel: 'Benchmark: 60%+' },
-  { id: 'internal_closed_tx', label: 'Internal Closed Treatment', short: 'Internal closed tx', section: 'Closing', resp: '', hint: 'Pre-existing patients starting implant treatment' },
-  { id: 'internal_closed_arches', label: 'Internal Closed Arches', short: 'Internal arches', section: 'Closing', resp: '', hint: 'Arches, not # of patients' },
-  { id: 'marketing_closed_tx', label: 'Marketing Closed Treatment', short: 'Marketing closed tx', section: 'Closing', resp: '', hint: 'First-time patients closed from marketing' },
-  { id: 'marketing_closed_arches', label: 'Marketing Closed Arches', short: 'Marketing arches', section: 'Closing', resp: '', hint: 'Arches, not # of patients' },
-  { id: 'total_closed_tx', label: 'Total Closed Treatment', short: 'Total closed tx', section: 'Closing', calc: (d) => add(d.internal_closed_tx, d.marketing_closed_tx) },
-  { id: 'total_closed_arches', label: 'Total Closed Arches', short: 'Total arches', section: 'Closing', calc: (d) => add(d.internal_closed_arches, d.marketing_closed_arches) },
-  { id: 'close_rate', label: 'Close Rate', short: 'Close rate', section: 'Closing', calc: (d) => pct(d.marketing_closed_tx, d.presented_treatment), bench: { low: 25 }, benchLabel: 'Benchmark: 25%+' },
-  { id: 'internal_revenue', label: 'Internal Closed Revenue', short: 'Internal revenue', section: 'Revenue', resp: '', dollar: true },
-  { id: 'marketing_revenue', label: 'Marketing Closed Revenue', short: 'Marketing revenue', section: 'Revenue', resp: '', dollar: true },
-  { id: 'total_revenue', label: 'Total Closed Revenue', short: 'Total revenue', section: 'Revenue', calc: (d) => add(d.internal_revenue, d.marketing_revenue), dollar: true },
-  { id: 'marketing_spend', label: 'Total Marketing Budget/Spend', short: 'Marketing spend', section: 'Marketing ROI', resp: '', dollar: true },
-  { id: 'cpl', label: 'Cost Per Lead (CPL)', short: 'Cost per lead', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.leads), dollar: true },
-  { id: 'cost_per_consult', label: 'Cost Per Consult', short: 'Cost per consult', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.consults_on_schedule), dollar: true },
-  { id: 'cost_per_tx', label: 'Cost Per Treatment Start', short: 'Cost per tx start', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.marketing_closed_tx), dollar: true },
-  { id: 'roas', label: 'Return on Ad Spend (ROAS)', short: 'ROAS', section: 'Marketing ROI', calc: (d) => divide(d.marketing_revenue, d.marketing_spend), roas: true },
+  { id: 'leads', label: 'Lead Contact Attempts', section: 'Lead Activity', resp: '', hint: '"# of Leads Worked"' },
+  { id: 'lead_phone_convos', label: 'Lead Phone Conversations', section: 'Lead Activity', resp: '' },
+  { id: 'consults_scheduled', label: 'Consults Scheduled (Regardless of when)', section: 'Lead Activity', resp: '' },
+  { id: 'booking_rate', label: 'Lead Schedule Rate', section: 'Lead Activity', calc: (d) => pct(d.consults_scheduled, d.leads), bench: { low: 15, high: 30 }, benchLabel: 'Benchmark: 15–30%' },
+  { id: 'rescheduled', label: 'Rescheduled to a different day', section: 'Lead Activity', resp: '' },
+  { id: 'cancelled', label: 'Cancellations', section: 'Lead Activity', resp: '' },
+  { id: 'consults_on_schedule', label: 'Consults on the Schedule (from marketing)', section: 'Show Rate', resp: '' },
+  { id: 'presented_treatment', label: 'Presented Treatment (Held Consultations from marketing)', section: 'Show Rate', resp: '' },
+  { id: 'show_rate', label: 'Consult Show Rate', section: 'Show Rate', calc: (d) => pct(d.presented_treatment, d.consults_on_schedule), bench: { low: 60 }, benchLabel: 'Benchmark: 60%+' },
+  { id: 'internal_closed_tx', label: 'INTERNAL Closed Treatment', section: 'Closing', resp: '', hint: '(# of pre-existing patients starting some form of implant treatment)' },
+  { id: 'internal_closed_arches', label: 'Internal Closed Arches', section: 'Closing', resp: '', hint: '(Not the # of patients)' },
+  { id: 'marketing_closed_tx', label: 'MARKETING Closed Treatment', section: 'Closing', resp: '', hint: '(# of 1st time patients closed from marketing regardless of consult date)' },
+  { id: 'marketing_closed_arches', label: 'Marketing Closed Arches', section: 'Closing', resp: '', hint: '(Not the # of patients)' },
+  { id: 'total_closed_tx', label: 'Total Closed Treatment', section: 'Closing', calc: (d) => add(d.internal_closed_tx, d.marketing_closed_tx) },
+  { id: 'total_closed_arches', label: 'Total Closed Arches', section: 'Closing', calc: (d) => add(d.internal_closed_arches, d.marketing_closed_arches) },
+  { id: 'close_rate', label: 'Close Rate', section: 'Closing', calc: (d) => pct(d.marketing_closed_tx, d.presented_treatment), bench: { low: 25 }, benchLabel: 'Benchmark: 25%+' },
+  { id: 'internal_revenue', label: 'Internal Closed Revenue', section: 'Revenue', resp: '', dollar: true },
+  { id: 'marketing_revenue', label: 'Marketing Closed Revenue', section: 'Revenue', resp: '', dollar: true },
+  { id: 'total_revenue', label: 'Total Closed Revenue', section: 'Revenue', calc: (d) => add(d.internal_revenue, d.marketing_revenue), dollar: true },
+  { id: 'marketing_spend', label: 'Total Marketing Budget/Spend', section: 'Marketing ROI', resp: '', dollar: true },
+  { id: 'cpl', label: 'Cost Per Lead (CPL)', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.leads), dollar: true },
+  { id: 'cost_per_consult', label: 'Cost Per Consult', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.consults_on_schedule), dollar: true },
+  { id: 'cost_per_tx', label: 'Cost Per Treatment Start', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.marketing_closed_tx), dollar: true },
+  { id: 'roas', label: 'Return on Ad Spend (ROAS)', section: 'Marketing ROI', calc: (d) => divide(d.marketing_revenue, d.marketing_spend), roas: true },
 ]
 
 export const KEY_METRICS = ['booking_rate', 'show_rate', 'close_rate', 'total_revenue']

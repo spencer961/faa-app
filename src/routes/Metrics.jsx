@@ -202,7 +202,7 @@ function ClientView({ clients, data, setData }) {
         <>
           <div className="stat-grid">
             {KEY_METRICS.map((id) => { const m = M(id); const v = aggregate(Object.values(data[cid]?.daily || {})); const val = v[id]; const bc = benchClass(m, val); return (
-              <div className="stat" key={id}><div className="stat-label">{m.short || m.label}</div><div className={'stat-val ' + bc}>{fmtVal(m, val, true)}</div><div className={'stat-bench ' + bc}>{m.benchLabel || 'All entries'}</div></div>
+              <div className="stat" key={id}><div className="stat-label">{m.label}</div><div className={'stat-val ' + bc}>{fmtVal(m, val, true)}</div><div className={'stat-bench ' + bc}>{m.benchLabel || 'All entries'}</div></div>
             )})}
           </div>
           <div className="entry-card">
@@ -231,7 +231,7 @@ function ClientView({ clients, data, setData }) {
                   <div className="field-grid">
                     {sec.metrics.map((mid) => { const m = M(mid); const has = form[mid] !== '' && form[mid] !== undefined && form[mid] !== null; return (
                       <div className={'field' + (has ? ' filled' : '')} key={mid}>
-                        <label>{m.short || m.label}</label>
+                        <label>{m.label}</label>
                         {m.hint && <span className="field-hint">{m.hint}</span>}
                         <div className={'input-wrap' + (m.dollar ? ' dollar' : '')}>
                           {m.dollar && <span className="dollar-sign">$</span>}
@@ -244,7 +244,7 @@ function ClientView({ clients, data, setData }) {
                     <div className="calc-tiles">
                       {sec.calcs.map((cid2) => { const m = M(cid2); const bc = m.bench ? benchClass(m, calcVals[cid2]) : 'neutral'; return (
                         <div className={'calc-tile ' + bc} key={cid2}>
-                          <span className="calc-label">{m.short || m.label}</span>
+                          <span className="calc-label">{m.label}</span>
                           <span className="calc-value">{fmtVal(m, calcVals[cid2])}</span>
                         </div>
                       )})}
@@ -429,7 +429,7 @@ const CSS = `
 .mx .band-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
 .mx .band-tag{display:inline-block;padding:3px 11px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:.02em;}
 .mx .band-desc{font-size:12px;color:#888786;}
-.mx .field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.mx .field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px;}
 .mx .field{display:flex;flex-direction:column;background:#fff;border:0.5px solid rgba(0,0,0,0.1);border-radius:9px;padding:9px 11px;transition:border-color .15s,box-shadow .15s;}
 .mx .field.filled{border-color:rgba(11,29,94,0.4);background:#fbfcff;}
 .mx .field:focus-within{border-color:#0b1d5e;box-shadow:0 0 0 3px rgba(11,29,94,0.08);}

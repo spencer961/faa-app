@@ -21,7 +21,8 @@
       "Bash(git commit -q -m 'Dashboard: remove Work queue view, keep By client + By category *)",
       "Bash(git commit -q -m 'Dashboard: separate View / Filter / Show on cards into distinct labeled panels *)",
       "Bash(git commit -q -m 'Dashboard: move Show on cards beside View switcher, drop control labels *)",
-      "Bash(git commit -q -m 'Metrics: redesign daily entry form to be easy to fill in *)"
+      "Bash(git commit -q -m 'Metrics: redesign daily entry form to be easy to fill in *)",
+      "Bash(git commit -q -m 'Metrics: use exact spreadsheet names for every metric *)"
     ]
   }
 }
