@@ -84,6 +84,10 @@ export default function Dashboard() {
   const [links, setLinks] = useState([])
   const [appData, setAppData] = useState({})
   const [filter, setFilter] = useState('all')
+  // How the board is organized: one card per client, links grouped by category,
+  // or a checkable work queue of every file to work through.
+  const [view, setView] = useState(() => { try { return localStorage.getItem('faa_dash_view') || 'clients' } catch { return 'clients' } })
+  const [queueDone, setQueueDone] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_dash_queue')) || {} } catch { return {} } })
   const [tiers, setTiers] = useState(DEFAULT_TIERS)
   const [compactFilter, setCompactFilter] = useState(() => { try { const v = localStorage.getItem('faa_dash_compact'); return v === null ? true : v === '1' } catch { return true } })
   const [editMode, setEditMode] = useState(false)
@@ -141,6 +145,9 @@ export default function Dashboard() {
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
   const toggleCompact = () => setCompactFilter((v) => { const n = !v; try { localStorage.setItem('faa_dash_compact', n ? '1' : '0') } catch { /* ignore */ } return n })
+  const switchView = (v) => { setView(v); setFilter('all'); try { localStorage.setItem('faa_dash_view', v) } catch { /* ignore */ } }
+  const toggleQueueDone = (key) => setQueueDone((q) => { const n = { ...q, [key]: !q[key] }; try { localStorage.setItem('faa_dash_queue', JSON.stringify(n)) } catch { /* ignore */ } return n })
+  const resetQueue = () => { setQueueDone({}); try { localStorage.removeItem('faa_dash_queue') } catch { /* ignore */ } }
   const enterClientMode = (id) => { setClientMode(id); try { localStorage.setItem('faa_client_mode', String(id)) } catch { /* ignore */ } setSelectModal(false); setDetailId(null); setEditMode(false) }
   const exitClientMode = () => { setClientMode(null); try { localStorage.removeItem('faa_client_mode') } catch { /* ignore */ } setEndModal(false) }
 
@@ -271,6 +278,8 @@ export default function Dashboard() {
   const shown = clientMode
     ? clients.filter((c) => c.id === clientMode)
     : clients.filter((c) => (filter === 'all' || String(c.id) === String(filter)) && (getTiers(c).length === 0 || getTiers(c).includes('consulting')))
+  // Distinct link categories, for the "By category" and "Work queue" views.
+  const cats = [...new Set(links.map((l) => (l.category || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
@@ -294,26 +303,43 @@ export default function Dashboard() {
       } />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
         {!clientMode && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 14, background: '#eeece8', borderRadius: 999, padding: 3, width: 'fit-content' }}>
+            {[['clients', 'By client'], ['category', 'By category'], ['queue', 'Work queue']].map(([v, label]) => (
+              <button key={v} onClick={() => switchView(v)} style={{ padding: '6px 16px', borderRadius: 999, border: 'none', background: view === v ? '#fff' : 'transparent', color: view === v ? NAVY : MUTED, fontSize: 12, fontWeight: view === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
+            ))}
+          </div>
+        )}
+        {!clientMode && view === 'clients' && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, alignItems: 'center' }}>
             <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>{compactFilter ? 'All' : 'All clients'}</button>
             {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} title={compactFilter ? c.name : undefined} style={pill(String(filter) === String(c.id))}>{compactFilter ? abbrOf(c) : c.name}</button>)}
             <button onClick={toggleCompact} title="Toggle abbreviated client names" style={{ height: 28, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: 'transparent', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>{compactFilter ? '↔ Full names' : '↔ Abbreviate'}</button>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Show on cards</span>
-          {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].filter(([k]) => !(clientMode && k === 'accounting')).map(([k, label]) => (
-            <button key={k} onClick={() => toggleLayer(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, border: '0.5px solid ' + (toggles[k] ? NAVY : 'rgba(0,0,0,0.15)'), background: toggles[k] ? 'rgba(11,29,94,0.05)' : '#fff', color: toggles[k] ? NAVY : MUTED, fontSize: 12, cursor: 'pointer' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
-            </button>
-          ))}
-        </div>
+        {!clientMode && view === 'category' && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, alignItems: 'center' }}>
+            <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All</button>
+            {cats.map((cat) => <button key={cat} onClick={() => setFilter(cat)} style={pill(String(filter) === String(cat))}>{cat}</button>)}
+          </div>
+        )}
+        {view === 'clients' && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Show on cards</span>
+            {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].filter(([k]) => !(clientMode && k === 'accounting')).map(([k, label]) => (
+              <button key={k} onClick={() => toggleLayer(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, border: '0.5px solid ' + (toggles[k] ? NAVY : 'rgba(0,0,0,0.15)'), background: toggles[k] ? 'rgba(11,29,94,0.05)' : '#fff', color: toggles[k] ? NAVY : MUTED, fontSize: 12, cursor: 'pointer' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
+              </button>
+            ))}
+          </div>
+        )}
         {!clients.length && <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>Loading clients…</div>}
+        {view === 'category' && <CategoryView cats={filter === 'all' ? cats : cats.filter((c) => String(c) === String(filter))} links={links} clients={clients} />}
+        {view === 'queue' && <QueueView cats={cats} links={links} clients={clients} queueDone={queueDone} onToggle={toggleQueueDone} onReset={resetQueue} />}
+        {view === 'clients' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
           {[...shown].sort((a, b) => (getPractices(a).length > 1 ? 1 : 0) - (getPractices(b).length > 1 ? 1 : 0)).map((c) => {
             const cl = links.filter((l) => l.clientId === c.id)
             const multi = getPractices(c).length > 1
-            const accent = c.info?.accentColor || c.accentColor || GOLD
             const meta = [infoField(c, 'doctor') || c.doctor, infoField(c, 'timezone') ? infoField(c, 'timezone').split('—')[0].trim() : ''].filter(Boolean).join(' · ')
             const practices = tabPractices(c)
             const activePrac = cardPractice[c.id] || null
@@ -333,7 +359,6 @@ export default function Dashboard() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ fontSize: 14, fontWeight: 500, color: TEXT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: accent, flexShrink: 0 }} />
                     </div>
                     {meta && <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{meta}</div>}
                   </div>
@@ -413,6 +438,7 @@ export default function Dashboard() {
             )
           })}
         </div>
+        )}
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
@@ -486,6 +512,92 @@ export default function Dashboard() {
   )
 }
 
+// "By category" view — every link grouped by its category, showing which clients have it.
+function CategoryView({ cats, links, clients }) {
+  if (!cats.length) return <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>No categories yet. Add links first.</div>
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14, alignItems: 'start' }}>
+      {cats.map((cat) => {
+        const cc = catColor(cat)
+        const catLinks = links.filter((l) => (l.category || '').trim() === cat)
+        return (
+          <div key={cat} style={{ ...card, padding: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: cc.bg, borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: cc.txt, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: cc.txt, flex: 1 }}>{cat}</span>
+              <span style={{ fontSize: 11, color: cc.txt, opacity: 0.75 }}>{catLinks.length} client{catLinks.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div style={{ padding: 8 }}>
+              {catLinks.map((l) => {
+                const client = clients.find((c) => c.id === l.clientId)
+                if (!client) return null
+                return (
+                  <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8 }}>
+                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{ini(client.name)}</span>
+                    <span style={{ fontSize: 13, color: TEXT, fontWeight: 500, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</span>
+                    {l.practice && <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>{l.practice}</span>}
+                    <button onClick={() => window.open(l.url, '_blank')} style={miniBtn}>Open →</button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// "Work queue" view — every file as a checkable to-do, grouped by category, so you can
+// work through each client's file of a type and tick it off. Progress is remembered locally.
+function QueueView({ cats, links, clients, queueDone, onToggle, onReset }) {
+  const total = cats.reduce((a, cat) => a + links.filter((l) => (l.category || '').trim() === cat).length, 0)
+  const done = Object.values(queueDone).filter(Boolean).length
+  if (!cats.length) return <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>No files yet. Add some first.</div>
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginBottom: 12 }}>
+        <span style={{ fontSize: 12, color: MUTED }}>{done}/{total} done</span>
+        <button onClick={onReset} style={{ height: 26, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: 'transparent', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>Reset</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14, alignItems: 'start' }}>
+        {cats.map((cat) => {
+          const cc = catColor(cat)
+          const catLinks = links.filter((l) => (l.category || '').trim() === cat)
+          return (
+            <div key={cat}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: cc.txt, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED }}>{cat}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {catLinks.map((l, i) => {
+                  const client = clients.find((c) => c.id === l.clientId)
+                  if (!client) return null
+                  const key = cat + '__' + l.id
+                  const isDone = !!queueDone[key]
+                  return (
+                    <div key={l.id} style={{ ...card, display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', opacity: isDone ? 0.5 : 1, transition: 'opacity .2s' }}>
+                      <span style={{ width: 20, textAlign: 'center', fontSize: 12, fontWeight: 600, color: isDone ? '#18a866' : MUTED, flexShrink: 0 }}>{isDone ? '✓' : i + 1}</span>
+                      <span style={{ width: 28, height: 28, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(client.name)}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: TEXT, textDecoration: isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</div>
+                        <div style={{ fontSize: 11, color: MUTED }}>{cat}{l.practice ? ' · ' + l.practice : ''}</div>
+                      </div>
+                      <button onClick={() => onToggle(key)} style={{ height: 28, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: isDone ? '#f2f1ee' : 'transparent', color: isDone ? MUTED : TEXT, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>{isDone ? 'Undo' : 'Done'}</button>
+                      <button onClick={() => window.open(l.url, '_blank')} style={miniBtn}>Open →</button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // A tier badge: a small colored dot with a custom tooltip that appears instantly on hover.
 function TierDot({ name, color }) {
   const [hover, setHover] = useState(false)
@@ -536,7 +648,6 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const billing = info.billing || c.billing || {}
   const payments = Array.isArray(info.payments) ? [...info.payments].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : []
   const lastPay = payments[0]
-  const accent = info.accentColor || c.accentColor || GOLD
   const shownLinks = links.filter((l) => !pracFilter || !l.practice || l.practice === pracFilter || l.practice === c.name)
   const addPractice = () => { const v = newPrac.trim(); if (!v || practices.includes(v)) return; onSavePractices(c.id, [...practices, v]); setNewPrac('') }
   return (
@@ -549,7 +660,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
           <div style={{ width: 48, height: 48, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>{ini(c.name)}</div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</span><span style={{ width: 8, height: 8, borderRadius: '50%', background: accent }} /></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</span></div>
             <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>{c.email || info.email || ''}</div>
           </div>
         </div>
