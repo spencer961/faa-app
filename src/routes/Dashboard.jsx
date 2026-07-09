@@ -41,7 +41,15 @@ const staffList = (info) => { let s = info?.staff; if (!s) return []; try { if (
 // text fields (doctor, staff, notes…) one level deeper at info.info — read
 // both so nothing shows blank.
 const getPractices = (c) => (Array.isArray(c?.info?.practices) ? c.info.practices.filter(Boolean) : [])
-const infoField = (c, k) => (c?.info?.info?.[k] ?? c?.info?.[k] ?? '')
+// Flat value wins (edits are written flat at info.x); legacy nested
+// info.info.x is the fallback so old data still shows until it's re-saved.
+const infoField = (c, k) => (c?.info?.[k] ?? c?.info?.info?.[k] ?? '')
+const parseStaff = (c) => {
+  let s = c?.info?.staff ?? c?.info?.info?.staff
+  if (!s) return []
+  try { if (typeof s === 'string') s = JSON.parse(s) } catch { return [] }
+  return Array.isArray(s) ? s.map((x) => (typeof x === 'object' ? { name: x.name || '', title: x.title || x.role || '', email: x.email || '' } : { name: String(x), title: '', email: '' })) : []
+}
 const PRACTICE_PALETTE = [
   { bg: '#E6F1FB', txt: '#0C447C' }, { bg: '#FAEEDA', txt: '#633806' }, { bg: '#E1F5EE', txt: '#085041' },
   { bg: '#FDEEF6', txt: '#8C1A5A' }, { bg: '#F0EDFB', txt: '#5A3DAA' }, { bg: '#EAF3DE', txt: '#274F0A' },
@@ -166,6 +174,20 @@ export default function Dashboard() {
     setAddClientModal(false)
     showToast('Client added ✓')
   }
+  async function saveClient(id, fields) {
+    const c = clients.find((x) => x.id === id); if (!c) return
+    const info = { ...(c.info || {}), ...fields.info }
+    const patch = { name: fields.name, doctor: fields.doctor || null, email: fields.email || null, info }
+    setClients((cs) => cs.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+    await supabase.from('clients').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+    showToast('Client saved ✓')
+  }
+  async function deleteClient(id) {
+    await supabase.from('clients').delete().eq('id', id)
+    setClients((cs) => cs.filter((x) => x.id !== id))
+    setDetailId(null)
+    showToast('Client deleted')
+  }
 
   async function persistTiers(next) {
     setTiers(next)
@@ -191,7 +213,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} toast={toast} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -384,11 +406,12 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, toast }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
   const [newTier, setNewTier] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
   const info = c.info || {}
   const practices = getPractices(c)
   const staff = staffList({ staff: infoField(c, 'staff') })
@@ -400,7 +423,10 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const addPractice = () => { const v = newPrac.trim(); if (!v || practices.includes(v)) return; onSavePractices(c.id, [...practices, v]); setNewPrac('') }
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
-      <Header sub="Client Detail" back="/" right={<button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← All clients</button>} />
+      <Header sub="Client Detail" back="/" right={<div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={() => setEditOpen(true)} style={{ background: GOLD, border: 'none', color: NAVY, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Edit profile</button>
+        <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← All clients</button>
+      </div>} />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
           <div style={{ width: 48, height: 48, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>{ini(c.name)}</div>
@@ -478,6 +504,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
         </div>
       </div>
       {linkEdit && <LinkModal modal={linkEdit} link={linkEdit.id ? links.find((l) => l.id === linkEdit.id) : null} clients={clients} onSave={(f) => { onSaveLink(f); setLinkEdit(null) }} onDelete={(id) => { onDeleteLink(id); setLinkEdit(null) }} onClose={() => setLinkEdit(null)} />}
+      {editOpen && <EditClientModal client={c} onSave={(f) => { onSaveClient(c.id, f); setEditOpen(false) }} onDelete={() => onDeleteClient(c.id)} onClose={() => setEditOpen(false)} />}
       {toast && <Toast msg={toast} />}
     </div>
   )
@@ -589,6 +616,71 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
             <button style={btnGhost} onClick={onClose}>Close</button>
           </div>
         </>)}
+      </div>
+    </div>
+  )
+}
+
+function EditClientModal({ client: c, onSave, onDelete, onClose }) {
+  const [f, setF] = useState({
+    name: c.name || '', doctor: c.doctor || infoField(c, 'doctor') || '', email: c.email || infoField(c, 'email') || '',
+    timezone: infoField(c, 'timezone') || '', website: infoField(c, 'website') || '',
+    numLocations: infoField(c, 'numLocations') || '', locations: infoField(c, 'locations') || '', notes: infoField(c, 'notes') || '',
+  })
+  const [staff, setStaff] = useState(() => parseStaff(c))
+  const [confirmDel, setConfirmDel] = useState(false)
+  const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
+  const setStaffRow = (i, k, v) => setStaff((st) => st.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)))
+  const save = () => {
+    if (!f.name.trim()) return
+    onSave({
+      name: f.name.trim(), doctor: f.doctor.trim(), email: f.email.trim(),
+      info: {
+        doctor: f.doctor.trim(), timezone: f.timezone.trim(), website: f.website.trim(),
+        numLocations: f.numLocations.trim(), locations: f.locations.trim(), notes: f.notes.trim(),
+        staff: staff.filter((s) => s.name.trim()).map((s) => ({ name: s.name.trim(), title: s.title.trim(), email: s.email.trim() })),
+      },
+    })
+  }
+  return (
+    <div onClick={onClose} style={overlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 580 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY, marginBottom: 16 }}>Edit client profile</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Field label="Practice name *"><input style={inp} value={f.name} onChange={(e) => set('name', e.target.value)} autoFocus /></Field>
+          <Field label="Doctor / owner"><input style={inp} value={f.doctor} onChange={(e) => set('doctor', e.target.value)} /></Field>
+          <Field label="Email"><input style={inp} value={f.email} onChange={(e) => set('email', e.target.value)} /></Field>
+          <Field label="Time zone"><input style={inp} value={f.timezone} onChange={(e) => set('timezone', e.target.value)} placeholder="e.g. CT" /></Field>
+          <Field label="Website"><input style={inp} value={f.website} onChange={(e) => set('website', e.target.value)} placeholder="https://…" /></Field>
+          <Field label="No. of locations"><input style={inp} value={f.numLocations} onChange={(e) => set('numLocations', e.target.value)} /></Field>
+        </div>
+        <Field label="Location names"><textarea style={{ ...inp, height: 52, padding: '8px 10px' }} value={f.locations} onChange={(e) => set('locations', e.target.value)} /></Field>
+        <Field label="Notes"><textarea style={{ ...inp, height: 68, padding: '8px 10px' }} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
+        <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, margin: '4px 0 8px' }}>Staff / team</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 4 }}>
+          {staff.map((s, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input style={{ ...inp, flex: 1 }} value={s.name} placeholder="Name" onChange={(e) => setStaffRow(i, 'name', e.target.value)} />
+              <input style={{ ...inp, flex: 1 }} value={s.title} placeholder="Title" onChange={(e) => setStaffRow(i, 'title', e.target.value)} />
+              <input style={{ ...inp, flex: 1.4 }} value={s.email} placeholder="Email" onChange={(e) => setStaffRow(i, 'email', e.target.value)} />
+              <button onClick={() => setStaff((st) => st.filter((_, idx) => idx !== i))} title="Remove" style={{ ...iconBtn, color: '#A32D2D', fontSize: 16 }}>×</button>
+            </div>
+          ))}
+          <button onClick={() => setStaff((st) => [...st, { name: '', title: '', email: '' }])} style={{ ...addRow, width: 'auto', alignSelf: 'flex-start', padding: '6px 12px' }}>+ Add staff</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }}>
+          {!confirmDel ? (
+            <button onClick={() => setConfirmDel(true)} style={{ ...btnGhost, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)', marginRight: 'auto' }}>Delete client</button>
+          ) : (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginRight: 'auto' }}>
+              <span style={{ fontSize: 12, color: '#A32D2D' }}>Delete permanently?</span>
+              <button onClick={() => setConfirmDel(false)} style={{ ...btnGhost, height: 30 }}>No</button>
+              <button onClick={onDelete} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, background: '#A32D2D', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Yes, delete</button>
+            </div>
+          )}
+          <button onClick={onClose} style={btnGhost}>Cancel</button>
+          <button onClick={save} style={btnPrimary}>Save profile</button>
+        </div>
       </div>
     </div>
   )

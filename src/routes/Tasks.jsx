@@ -20,7 +20,7 @@ const PRIORITIES = ['high', 'medium', 'low']
 function getStaff(client) {
   // Staff may live nested at info.info.staff (legacy) or flat at info.staff,
   // and is often a JSON string.
-  let s = client?.info?.info?.staff ?? client?.info?.staff
+  let s = client?.info?.staff ?? client?.info?.info?.staff
   if (!s) return []
   try {
     if (typeof s === 'string') s = JSON.parse(s)
