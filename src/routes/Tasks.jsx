@@ -18,9 +18,11 @@ const STATUSES = ['not_started', 'in_progress', 'waiting', 'done']
 const PRIORITIES = ['high', 'medium', 'low']
 
 function getStaff(client) {
-  if (!client?.info?.staff) return []
+  // Staff may live nested at info.info.staff (legacy) or flat at info.staff,
+  // and is often a JSON string.
+  let s = client?.info?.info?.staff ?? client?.info?.staff
+  if (!s) return []
   try {
-    let s = client.info.staff
     if (typeof s === 'string') s = JSON.parse(s)
     return Array.isArray(s) ? s.map((x) => (typeof x === 'object' ? x.name : x)).filter(Boolean) : []
   } catch {
