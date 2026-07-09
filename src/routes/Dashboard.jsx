@@ -74,6 +74,7 @@ export default function Dashboard() {
   const [clientMode, setClientMode] = useState(() => { try { const v = localStorage.getItem('faa_client_mode'); return v ? parseInt(v) : null } catch { return null } })
   const [selectModal, setSelectModal] = useState(false)
   const [endModal, setEndModal] = useState(false)
+  const [addClientModal, setAddClientModal] = useState(false)
   const [metricsByClient, setMetricsByClient] = useState({})
   const [snaps] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } })
   const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, accounting: false, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true, accounting: false } } })
@@ -145,6 +146,14 @@ export default function Dashboard() {
   const deletePayment = (clientId, p) => { const c = clients.find((x) => x.id === clientId); patchInfo(clientId, { payments: (c?.info?.payments || []).filter((x) => !(x.recorded === p.recorded && x.date === p.date && x.amount === p.amount)) }) }
   const saveBilling = (clientId, billing) => patchInfo(clientId, { billing })
 
+  async function addClient(form) {
+    if (!form.name.trim()) return
+    const { data } = await supabase.from('clients').insert({ name: form.name.trim(), doctor: form.doctor.trim() || null, email: form.email.trim() || null, status: 'active', info: {} }).select()
+    if (data?.[0]) setClients((cs) => [...cs, { ...data[0], info: data[0].info || {} }])
+    setAddClientModal(false)
+    showToast('Client added ✓')
+  }
+
   const M = (id) => METRICS.find((m) => m.id === id)
   const openTasks = (cid) => tasks.filter((t) => t.client_id === cid && t.status !== 'done').length
   const clientHealth = (cid) => { const s = snaps[cid] || []; if (!s.length) return null; const latest = [...s].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-1)[0]; return health(latest.scores) }
@@ -165,6 +174,7 @@ export default function Dashboard() {
           </button>
         ) : (
           <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setAddClientModal(true)} style={{ background: GOLD, border: 'none', color: NAVY, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>+ Client</button>
             <button onClick={() => setSelectModal(true)} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Client Mode</button>
             <button onClick={() => setEditMode((e) => !e)} style={{ background: editMode ? GOLD : 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: editMode ? NAVY : 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>{editMode ? 'Done editing' : 'Edit links'}</button>
           </div>
@@ -246,7 +256,7 @@ export default function Dashboard() {
                   {cvis.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
                   {editMode && <button onClick={(e) => { e.stopPropagation(); setLinkModal({ clientId: c.id, practice: activePrac || '' }) }} style={addRow}>+ Add link</button>}
                 </div>
-                {toggles.accounting && (() => {
+                {toggles.accounting && !clientMode && (() => {
                   const billing = c.info?.billing || c.billing || {}
                   const payments = Array.isArray(c.info?.payments) ? c.info.payments : []
                   const lastPay = [...payments].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]
@@ -275,6 +285,7 @@ export default function Dashboard() {
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
+      {addClientModal && <AddClientModal onClose={() => setAddClientModal(false)} onSave={addClient} />}
       {selectModal && (
         <div onClick={() => setSelectModal(false)} style={overlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 420 }}>
@@ -511,6 +522,25 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
             <button style={btnGhost} onClick={onClose}>Close</button>
           </div>
         </>)}
+      </div>
+    </div>
+  )
+}
+
+function AddClientModal({ onClose, onSave }) {
+  const [form, setForm] = useState({ name: '', doctor: '', email: '' })
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  return (
+    <div onClick={onClose} style={overlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 420 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY, marginBottom: 16 }}>Add new client</h3>
+        <Field label="Practice / client name *"><input style={inp} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Bright Smiles Dental" autoFocus /></Field>
+        <Field label="Doctor / owner"><input style={inp} value={form.doctor} onChange={(e) => set('doctor', e.target.value)} placeholder="e.g. Dr. Anna Torres" /></Field>
+        <Field label="Email"><input style={inp} value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="hello@practice.com" /></Field>
+        <div style={modalActions}>
+          <button style={btnGhost} onClick={onClose}>Cancel</button>
+          <button style={btnPrimary} onClick={() => onSave(form)}>Add client</button>
+        </div>
       </div>
     </div>
   )
