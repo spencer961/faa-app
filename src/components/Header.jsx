@@ -56,6 +56,8 @@ function NavMenu() {
             <Link
               key={item.to}
               to={item.to}
+              target="_blank"
+              rel="noopener"
               onClick={() => setOpen(false)}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f4f8' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#fff' }}
