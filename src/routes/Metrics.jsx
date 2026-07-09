@@ -16,10 +16,10 @@ import {
 // (replaced with an explicit Save button).
 
 const ENTRY_SECTIONS = [
-  { label: 'Lead Activity', bg: '#E6F1FB', tc: '#0C447C', metrics: ['leads', 'lead_phone_convos', 'consults_scheduled', 'rescheduled', 'cancelled'], calcs: ['booking_rate'] },
-  { label: 'Show Rate', bg: '#EEEDFE', tc: '#3C3489', metrics: ['consults_on_schedule', 'presented_treatment'], calcs: ['show_rate'] },
-  { label: 'Closing', bg: '#E1F5EE', tc: '#085041', metrics: ['internal_closed_tx', 'internal_closed_arches', 'marketing_closed_tx', 'marketing_closed_arches'], calcs: ['total_closed_tx', 'total_closed_arches', 'close_rate'] },
-  { label: 'Revenue & Marketing', bg: '#FAEEDA', tc: '#633806', metrics: ['internal_revenue', 'marketing_revenue', 'marketing_spend'], calcs: ['total_revenue', 'cpl', 'cost_per_consult', 'cost_per_tx', 'roas'] },
+  { label: 'Lead Activity', desc: 'Leads and how many turned into booked consults', bg: '#E6F1FB', tc: '#0C447C', accent: '#0C447C', metrics: ['leads', 'lead_phone_convos', 'consults_scheduled', 'rescheduled', 'cancelled'], calcs: ['booking_rate'] },
+  { label: 'Show Rate', desc: 'Who actually showed up for their consult', bg: '#EEEDFE', tc: '#3C3489', accent: '#3C3489', metrics: ['consults_on_schedule', 'presented_treatment'], calcs: ['show_rate'] },
+  { label: 'Closing', desc: 'Treatment starts and arches closed', bg: '#E1F5EE', tc: '#085041', accent: '#085041', metrics: ['internal_closed_tx', 'internal_closed_arches', 'marketing_closed_tx', 'marketing_closed_arches'], calcs: ['total_closed_tx', 'total_closed_arches', 'close_rate'] },
+  { label: 'Revenue & Marketing', desc: 'Dollars in, dollars spent, and your return', bg: '#FAEEDA', tc: '#633806', accent: '#633806', metrics: ['internal_revenue', 'marketing_revenue', 'marketing_spend'], calcs: ['total_revenue', 'cpl', 'cost_per_consult', 'cost_per_tx', 'roas'] },
 ]
 const M = (id) => METRICS.find((m) => m.id === id)
 const today = () => new Date().toISOString().split('T')[0]
@@ -173,6 +173,16 @@ function ClientView({ clients, data, setData }) {
   }
 
   const isToday = date === today()
+  const filled = INPUT_METRICS.filter((m) => form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null).length
+  const totalInputs = INPUT_METRICS.length
+  // Enter or ↓ jumps to the next number field for fast keyboard entry.
+  const onKey = (e) => {
+    if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const inputs = [...e.currentTarget.closest('.entry-card').querySelectorAll('input.metric-input')]
+    const i = inputs.indexOf(e.currentTarget)
+    const next = e.key === 'ArrowUp' ? inputs[i - 1] : inputs[i + 1]
+    if (next) { e.preventDefault(); next.focus(); next.select() }
+  }
 
   return (
     <>
@@ -192,32 +202,54 @@ function ClientView({ clients, data, setData }) {
         <>
           <div className="stat-grid">
             {KEY_METRICS.map((id) => { const m = M(id); const v = aggregate(Object.values(data[cid]?.daily || {})); const val = v[id]; const bc = benchClass(m, val); return (
-              <div className="stat" key={id}><div className="stat-label">{m.label}</div><div className={'stat-val ' + bc}>{fmtVal(m, val, true)}</div><div className={'stat-bench ' + bc}>{m.benchLabel || 'All entries'}</div></div>
+              <div className="stat" key={id}><div className="stat-label">{m.short || m.label}</div><div className={'stat-val ' + bc}>{fmtVal(m, val, true)}</div><div className={'stat-bench ' + bc}>{m.benchLabel || 'All entries'}</div></div>
             )})}
           </div>
           <div className="entry-card">
             <div className="entry-bar">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button className="nav-btn" onClick={() => setDate(shiftDate(date, -1))}>‹</button>
+                <button className="nav-btn" onClick={() => setDate(shiftDate(date, -1))} title="Previous day">‹</button>
                 <input type="date" className="slim" value={date} onChange={(e) => setDate(e.target.value)} />
-                <button className="nav-btn" onClick={() => !isToday && setDate(shiftDate(date, 1))} disabled={isToday} style={{ opacity: isToday ? 0.3 : 1 }}>›</button>
+                <button className="nav-btn" onClick={() => !isToday && setDate(shiftDate(date, 1))} disabled={isToday} style={{ opacity: isToday ? 0.3 : 1 }} title="Next day">›</button>
                 {isToday && <span className="today-pill">Today</span>}
               </div>
-              <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save' : 'Saved'}</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="progress-wrap" title={filled + ' of ' + totalInputs + ' fields entered'}>
+                  <div className="progress-bar"><div className="progress-fill" style={{ width: (filled / totalInputs * 100) + '%' }} /></div>
+                  <span className="progress-txt">{filled}/{totalInputs}</span>
+                </div>
+                <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save' : 'Saved ✓'}</button>
+              </div>
             </div>
-            <div className="entry-grid">
+            <div className="entry-sections">
               {ENTRY_SECTIONS.map((sec) => (
-                <div className="entry-sec" key={sec.label}>
-                  <span className="sec-tag" style={{ background: sec.bg, color: sec.tc }}>{sec.label}</span>
-                  {sec.metrics.map((mid) => { const m = M(mid); return (
-                    <div className="fld" key={mid}>
-                      <label>{m.label}</label>
-                      <input type="number" min="0" value={form[mid] ?? ''} placeholder="0" onChange={(e) => setField(mid, e.target.value)} />
+                <div className="entry-band" key={sec.label} style={{ borderLeftColor: sec.accent }}>
+                  <div className="band-head">
+                    <span className="band-tag" style={{ background: sec.bg, color: sec.tc }}>{sec.label}</span>
+                    <span className="band-desc">{sec.desc}</span>
+                  </div>
+                  <div className="field-grid">
+                    {sec.metrics.map((mid) => { const m = M(mid); const has = form[mid] !== '' && form[mid] !== undefined && form[mid] !== null; return (
+                      <div className={'field' + (has ? ' filled' : '')} key={mid}>
+                        <label>{m.short || m.label}</label>
+                        {m.hint && <span className="field-hint">{m.hint}</span>}
+                        <div className={'input-wrap' + (m.dollar ? ' dollar' : '')}>
+                          {m.dollar && <span className="dollar-sign">$</span>}
+                          <input className="metric-input" type="number" min="0" inputMode="decimal" value={form[mid] ?? ''} placeholder="0" onChange={(e) => setField(mid, e.target.value)} onFocus={(e) => e.target.select()} onKeyDown={onKey} />
+                        </div>
+                      </div>
+                    )})}
+                  </div>
+                  {sec.calcs.length > 0 && (
+                    <div className="calc-tiles">
+                      {sec.calcs.map((cid2) => { const m = M(cid2); const bc = m.bench ? benchClass(m, calcVals[cid2]) : 'neutral'; return (
+                        <div className={'calc-tile ' + bc} key={cid2}>
+                          <span className="calc-label">{m.short || m.label}</span>
+                          <span className="calc-value">{fmtVal(m, calcVals[cid2])}</span>
+                        </div>
+                      )})}
                     </div>
-                  )})}
-                  {sec.calcs.map((cid2) => { const m = M(cid2); return (
-                    <div className="calc-chip" key={cid2}><span>{m.label}</span><span>{fmtVal(m, calcVals[cid2])}</span></div>
-                  )})}
+                  )}
                 </div>
               ))}
             </div>
@@ -388,16 +420,34 @@ const CSS = `
 .mx .entry-bar{padding:12px 16px;border-bottom:0.5px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .mx .nav-btn{width:30px;height:30px;border:0.5px solid rgba(0,0,0,0.12);border-radius:6px;background:transparent;cursor:pointer;font-size:16px;line-height:1;color:#1a1a1a;}
 .mx .today-pill{padding:2px 10px;border-radius:10px;border:1.5px solid #bc9762;color:#bc9762;font-size:11px;font-weight:600;}
-.mx .entry-grid{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.mx .entry-sec{background:#fff;border:0.5px solid rgba(0,0,0,0.08);border-radius:10px;padding:14px;}
-.mx .sec-tag{display:inline-block;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:600;margin-bottom:10px;}
-.mx .fld{padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,0.05);}
-.mx .fld label{display:block;font-size:11px;font-weight:500;color:#888786;margin-bottom:5px;}
-.mx .fld input{width:120px;height:40px;border:0.5px solid rgba(0,0,0,0.12);border-radius:8px;font-size:20px;font-weight:500;color:#1a1a1a;background:#f9f9f8;padding:0 12px;}
-.mx .fld input:focus{border-color:#0b1d5e;outline:none;}
-.mx .calc-chip{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;background:#f5f5f4;margin-top:6px;}
-.mx .calc-chip span:first-child{font-size:12px;color:#888786;}
-.mx .calc-chip span:last-child{font-size:14px;font-weight:500;color:#1a1a1a;}
+.mx .progress-wrap{display:flex;align-items:center;gap:7px;}
+.mx .progress-bar{width:70px;height:6px;border-radius:3px;background:#eceae7;overflow:hidden;}
+.mx .progress-fill{height:100%;background:#0b1d5e;border-radius:3px;transition:width .3s;}
+.mx .progress-txt{font-size:11px;color:#888786;font-variant-numeric:tabular-nums;}
+.mx .entry-sections{padding:14px;display:flex;flex-direction:column;gap:14px;}
+.mx .entry-band{background:#fbfbfa;border:0.5px solid rgba(0,0,0,0.08);border-left:3px solid #0b1d5e;border-radius:10px;padding:14px 16px;}
+.mx .band-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.mx .band-tag{display:inline-block;padding:3px 11px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:.02em;}
+.mx .band-desc{font-size:12px;color:#888786;}
+.mx .field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.mx .field{display:flex;flex-direction:column;background:#fff;border:0.5px solid rgba(0,0,0,0.1);border-radius:9px;padding:9px 11px;transition:border-color .15s,box-shadow .15s;}
+.mx .field.filled{border-color:rgba(11,29,94,0.4);background:#fbfcff;}
+.mx .field:focus-within{border-color:#0b1d5e;box-shadow:0 0 0 3px rgba(11,29,94,0.08);}
+.mx .field label{font-size:12px;font-weight:600;color:#1a1a1a;line-height:1.25;}
+.mx .field-hint{font-size:10px;color:#a0a09e;line-height:1.3;margin-top:1px;}
+.mx .input-wrap{display:flex;align-items:center;margin-top:7px;}
+.mx .input-wrap.dollar .dollar-sign{font-size:16px;color:#888786;margin-right:2px;font-weight:500;}
+.mx .metric-input{width:100%;height:38px;border:none;background:transparent;font-size:22px;font-weight:600;color:#1a1a1a;padding:0;font-variant-numeric:tabular-nums;}
+.mx .metric-input:focus{outline:none;}
+.mx .metric-input::placeholder{color:#cfcecb;font-weight:500;}
+.mx .calc-tiles{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:0.5px dashed rgba(0,0,0,0.1);}
+.mx .calc-tile{display:flex;flex-direction:column;gap:2px;padding:7px 12px;border-radius:8px;background:#f2f1ee;min-width:96px;}
+.mx .calc-tile .calc-label{font-size:10px;color:#888786;text-transform:uppercase;letter-spacing:.03em;}
+.mx .calc-tile .calc-value{font-size:16px;font-weight:600;}
+.mx .calc-tile.good{background:#EAF3DE;} .mx .calc-tile.good .calc-value{color:#27500A;}
+.mx .calc-tile.warn{background:#FAEEDA;} .mx .calc-tile.warn .calc-value{color:#633806;}
+.mx .calc-tile.bad{background:#FCEBEB;} .mx .calc-tile.bad .calc-value{color:#791F1F;}
+.mx .calc-tile.neutral .calc-value{color:#1a1a1a;}
 .mx .agg-table{border-collapse:collapse;width:100%;min-width:600px;}
 .mx .agg-table th{padding:7px 10px;font-size:11px;font-weight:600;color:#888786;text-align:center;background:#f9f9f8;white-space:nowrap;}
 .mx .agg-table td{padding:6px 10px;text-align:center;font-size:12px;border-top:0.5px solid rgba(0,0,0,0.05);white-space:nowrap;}
@@ -406,5 +456,5 @@ const CSS = `
 .mx .chart-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .mx .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0b1d5e;color:#fff;font-size:12px;padding:8px 18px;border-radius:20px;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;}
 .mx .toast.show{opacity:1;}
-@media(max-width:700px){.mx .entry-grid,.mx .chart-2col,.mx .stat-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:700px){.mx .chart-2col,.mx .stat-grid{grid-template-columns:1fr 1fr;}}
 `
