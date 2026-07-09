@@ -18,7 +18,8 @@
       "Bash(git commit -q -m 'Dashboard: tier dots use a custom instant tooltip instead of native title *)",
       "Read(//Users/bobbiejohealey/Documents/FAA/**)",
       "Bash(git commit -q -m 'Dashboard: remove placeholder accent dot + add By client/category/queue views *)",
-      "Bash(git commit -q -m 'Dashboard: remove Work queue view, keep By client + By category *)"
+      "Bash(git commit -q -m 'Dashboard: remove Work queue view, keep By client + By category *)",
+      "Bash(git commit -q -m 'Dashboard: separate View / Filter / Show on cards into distinct labeled panels *)"
     ]
   }
 }

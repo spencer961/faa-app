@@ -299,33 +299,46 @@ export default function Dashboard() {
       } />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
         {!clientMode && (
-          <div style={{ display: 'flex', gap: 4, marginBottom: 14, background: '#eeece8', borderRadius: 999, padding: 3, width: 'fit-content' }}>
-            {[['clients', 'By client'], ['category', 'By category']].map(([v, label]) => (
-              <button key={v} onClick={() => switchView(v)} style={{ padding: '6px 16px', borderRadius: 999, border: 'none', background: view === v ? '#fff' : 'transparent', color: view === v ? NAVY : MUTED, fontSize: 12, fontWeight: view === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
-            ))}
-          </div>
-        )}
-        {!clientMode && view === 'clients' && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, alignItems: 'center' }}>
-            <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>{compactFilter ? 'All' : 'All clients'}</button>
-            {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} title={compactFilter ? c.name : undefined} style={pill(String(filter) === String(c.id))}>{compactFilter ? abbrOf(c) : c.name}</button>)}
-            <button onClick={toggleCompact} title="Toggle abbreviated client names" style={{ height: 28, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: 'transparent', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>{compactFilter ? '↔ Full names' : '↔ Abbreviate'}</button>
-          </div>
-        )}
-        {!clientMode && view === 'category' && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, alignItems: 'center' }}>
-            <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All</button>
-            {cats.map((cat) => <button key={cat} onClick={() => setFilter(cat)} style={pill(String(filter) === String(cat))}>{cat}</button>)}
-          </div>
-        )}
-        {view === 'clients' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Show on cards</span>
-            {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].filter(([k]) => !(clientMode && k === 'accounting')).map(([k, label]) => (
-              <button key={k} onClick={() => toggleLayer(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, border: '0.5px solid ' + (toggles[k] ? NAVY : 'rgba(0,0,0,0.15)'), background: toggles[k] ? 'rgba(11,29,94,0.05)' : '#fff', color: toggles[k] ? NAVY : MUTED, fontSize: 12, cursor: 'pointer' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
-              </button>
-            ))}
+          <div style={{ marginBottom: 18 }}>
+            <div style={ctrlPanel('#f1eee9')}>
+              <span style={ctrlLabel}>View</span>
+              <div style={{ display: 'flex', gap: 4, background: '#e3dfd8', borderRadius: 999, padding: 3, width: 'fit-content' }}>
+                {[['clients', 'By client'], ['category', 'By category']].map(([v, label]) => (
+                  <button key={v} onClick={() => switchView(v)} style={{ padding: '6px 16px', borderRadius: 999, border: 'none', background: view === v ? '#fff' : 'transparent', color: view === v ? NAVY : MUTED, fontSize: 12, fontWeight: view === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
+                ))}
+              </div>
+            </div>
+            {view === 'clients' && (
+              <div style={ctrlPanel('rgba(11,29,94,0.04)')}>
+                <span style={ctrlLabel}>Filter</span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+                  <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>{compactFilter ? 'All' : 'All clients'}</button>
+                  {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} title={compactFilter ? c.name : undefined} style={pill(String(filter) === String(c.id))}>{compactFilter ? abbrOf(c) : c.name}</button>)}
+                  <button onClick={toggleCompact} title="Toggle abbreviated client names" style={{ height: 28, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: 'transparent', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>{compactFilter ? '↔ Full names' : '↔ Abbreviate'}</button>
+                </div>
+              </div>
+            )}
+            {view === 'category' && (
+              <div style={ctrlPanel('rgba(11,29,94,0.04)')}>
+                <span style={ctrlLabel}>Filter</span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+                  <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All</button>
+                  {cats.map((cat) => <button key={cat} onClick={() => setFilter(cat)} style={pill(String(filter) === String(cat))}>{cat}</button>)}
+                </div>
+              </div>
+            )}
+            {view === 'clients' && (
+              <div style={ctrlPanel('rgba(24,168,102,0.06)')}>
+                <span style={ctrlLabel}>Show on cards</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+                  {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].map(([k, label]) => (
+                    <button key={k} onClick={() => toggleLayer(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, border: '0.5px solid ' + (toggles[k] ? NAVY : 'rgba(0,0,0,0.15)'), background: toggles[k] ? '#fff' : 'transparent', color: toggles[k] ? NAVY : MUTED, fontSize: 12, cursor: 'pointer' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {!clients.length && <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>Loading clients…</div>}
@@ -1104,6 +1117,10 @@ const miniBtn = { height: 26, padding: '0 9px', border: '0.5px solid rgba(0,0,0,
 const miniBtnP = { height: 26, padding: '0 9px', border: 'none', borderRadius: 6, background: NAVY, color: GOLD, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, whiteSpace: 'nowrap' }
 const card = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '16px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column' }
 const sectionCard = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '18px 20px' }
+// A labeled toolbar panel — each dashboard control (View / Filter / Show on cards)
+// gets its own tinted panel so it reads as a distinct feature. `tint` is the bg color.
+const ctrlPanel = (tint) => ({ display: 'flex', alignItems: 'center', gap: 12, background: tint, border: '0.5px solid rgba(0,0,0,0.07)', borderRadius: 10, padding: '9px 14px', marginBottom: 10, flexWrap: 'wrap' })
+const ctrlLabel = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: MUTED, flexShrink: 0, width: 78 }
 const addRow = { display: 'flex', alignItems: 'center', gap: 5, padding: '6px 9px', border: '0.5px dashed rgba(0,0,0,0.2)', borderRadius: 8, color: MUTED, fontSize: 12, cursor: 'pointer', background: 'none', width: '100%', fontFamily: 'inherit' }
 const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: MUTED, padding: '2px 4px', fontSize: 13, lineHeight: 1 }
 const noteLink = { background: 'none', border: 'none', padding: 0, color: NAVY, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }
