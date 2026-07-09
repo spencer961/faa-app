@@ -84,10 +84,8 @@ export default function Dashboard() {
   const [links, setLinks] = useState([])
   const [appData, setAppData] = useState({})
   const [filter, setFilter] = useState('all')
-  // How the board is organized: one card per client, links grouped by category,
-  // or a checkable work queue of every file to work through.
-  const [view, setView] = useState(() => { try { return localStorage.getItem('faa_dash_view') || 'clients' } catch { return 'clients' } })
-  const [queueDone, setQueueDone] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_dash_queue')) || {} } catch { return {} } })
+  // How the board is organized: one card per client, or links grouped by category.
+  const [view, setView] = useState(() => { try { const v = localStorage.getItem('faa_dash_view'); return v === 'category' ? 'category' : 'clients' } catch { return 'clients' } })
   const [tiers, setTiers] = useState(DEFAULT_TIERS)
   const [compactFilter, setCompactFilter] = useState(() => { try { const v = localStorage.getItem('faa_dash_compact'); return v === null ? true : v === '1' } catch { return true } })
   const [editMode, setEditMode] = useState(false)
@@ -146,8 +144,6 @@ export default function Dashboard() {
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
   const toggleCompact = () => setCompactFilter((v) => { const n = !v; try { localStorage.setItem('faa_dash_compact', n ? '1' : '0') } catch { /* ignore */ } return n })
   const switchView = (v) => { setView(v); setFilter('all'); try { localStorage.setItem('faa_dash_view', v) } catch { /* ignore */ } }
-  const toggleQueueDone = (key) => setQueueDone((q) => { const n = { ...q, [key]: !q[key] }; try { localStorage.setItem('faa_dash_queue', JSON.stringify(n)) } catch { /* ignore */ } return n })
-  const resetQueue = () => { setQueueDone({}); try { localStorage.removeItem('faa_dash_queue') } catch { /* ignore */ } }
   const enterClientMode = (id) => { setClientMode(id); try { localStorage.setItem('faa_client_mode', String(id)) } catch { /* ignore */ } setSelectModal(false); setDetailId(null); setEditMode(false) }
   const exitClientMode = () => { setClientMode(null); try { localStorage.removeItem('faa_client_mode') } catch { /* ignore */ } setEndModal(false) }
 
@@ -278,7 +274,7 @@ export default function Dashboard() {
   const shown = clientMode
     ? clients.filter((c) => c.id === clientMode)
     : clients.filter((c) => (filter === 'all' || String(c.id) === String(filter)) && (getTiers(c).length === 0 || getTiers(c).includes('consulting')))
-  // Distinct link categories, for the "By category" and "Work queue" views.
+  // Distinct link categories, for the "By category" view.
   const cats = [...new Set(links.map((l) => (l.category || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 
   return (
@@ -304,7 +300,7 @@ export default function Dashboard() {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
         {!clientMode && (
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, background: '#eeece8', borderRadius: 999, padding: 3, width: 'fit-content' }}>
-            {[['clients', 'By client'], ['category', 'By category'], ['queue', 'Work queue']].map(([v, label]) => (
+            {[['clients', 'By client'], ['category', 'By category']].map(([v, label]) => (
               <button key={v} onClick={() => switchView(v)} style={{ padding: '6px 16px', borderRadius: 999, border: 'none', background: view === v ? '#fff' : 'transparent', color: view === v ? NAVY : MUTED, fontSize: 12, fontWeight: view === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
             ))}
           </div>
@@ -334,7 +330,6 @@ export default function Dashboard() {
         )}
         {!clients.length && <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>Loading clients…</div>}
         {view === 'category' && <CategoryView cats={filter === 'all' ? cats : cats.filter((c) => String(c) === String(filter))} links={links} clients={clients} />}
-        {view === 'queue' && <QueueView cats={cats} links={links} clients={clients} queueDone={queueDone} onToggle={toggleQueueDone} onReset={resetQueue} />}
         {view === 'clients' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
           {[...shown].sort((a, b) => (getPractices(a).length > 1 ? 1 : 0) - (getPractices(b).length > 1 ? 1 : 0)).map((c) => {
@@ -544,56 +539,6 @@ function CategoryView({ cats, links, clients }) {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-// "Work queue" view — every file as a checkable to-do, grouped by category, so you can
-// work through each client's file of a type and tick it off. Progress is remembered locally.
-function QueueView({ cats, links, clients, queueDone, onToggle, onReset }) {
-  const total = cats.reduce((a, cat) => a + links.filter((l) => (l.category || '').trim() === cat).length, 0)
-  const done = Object.values(queueDone).filter(Boolean).length
-  if (!cats.length) return <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>No files yet. Add some first.</div>
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginBottom: 12 }}>
-        <span style={{ fontSize: 12, color: MUTED }}>{done}/{total} done</span>
-        <button onClick={onReset} style={{ height: 26, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: 'transparent', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>Reset</button>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14, alignItems: 'start' }}>
-        {cats.map((cat) => {
-          const cc = catColor(cat)
-          const catLinks = links.filter((l) => (l.category || '').trim() === cat)
-          return (
-            <div key={cat}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: cc.txt, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED }}>{cat}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {catLinks.map((l, i) => {
-                  const client = clients.find((c) => c.id === l.clientId)
-                  if (!client) return null
-                  const key = cat + '__' + l.id
-                  const isDone = !!queueDone[key]
-                  return (
-                    <div key={l.id} style={{ ...card, display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', opacity: isDone ? 0.5 : 1, transition: 'opacity .2s' }}>
-                      <span style={{ width: 20, textAlign: 'center', fontSize: 12, fontWeight: 600, color: isDone ? '#18a866' : MUTED, flexShrink: 0 }}>{isDone ? '✓' : i + 1}</span>
-                      <span style={{ width: 28, height: 28, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(client.name)}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: TEXT, textDecoration: isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</div>
-                        <div style={{ fontSize: 11, color: MUTED }}>{cat}{l.practice ? ' · ' + l.practice : ''}</div>
-                      </div>
-                      <button onClick={() => onToggle(key)} style={{ height: 28, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: isDone ? '#f2f1ee' : 'transparent', color: isDone ? MUTED : TEXT, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>{isDone ? 'Undo' : 'Done'}</button>
-                      <button onClick={() => window.open(l.url, '_blank')} style={miniBtn}>Open →</button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
