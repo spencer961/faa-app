@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { NAVY, GOLD, BG, BORDER, TEXT, MUTED, CARD, INP, BTNP, BTNS } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
@@ -24,7 +25,8 @@ export default function SuccessMap() {
   const [selM, setSelM] = useState(null)
   const [exp, setExp] = useState({})
   const [ass, setAss] = useState({ scores: {}, label: '', notes: '' })
-  const cm = getClientMode()
+  const [searchParams] = useSearchParams()
+  const cm = (searchParams.get('client') ? parseInt(searchParams.get('client')) : null) || getClientMode()
 
   useEffect(() => {
     supabase.from('clients').select('id,name,doctor,email,status,info').order('id').then(({ data }) => {

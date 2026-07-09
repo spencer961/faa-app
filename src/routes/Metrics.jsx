@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Chart from 'chart.js/auto'
 import Header from '../components/Header.jsx'
 import { supabase, SUPABASE_URL, SB_HEADERS } from '../lib/supabase.js'
@@ -30,7 +30,8 @@ const mkLabel = (k, period) => period === 'monthly' ? new Date(k + '-01T12:00:00
 export default function Metrics() {
   const [clients, setClients] = useState([])
   const [data, setData] = useState({}) // {clientId:{period:{dateKey:{metricId:value}}}}
-  const cm = getClientMode()
+  const [searchParams] = useSearchParams()
+  const cm = (searchParams.get('client') ? parseInt(searchParams.get('client')) : null) || getClientMode()
   const [mainView, setMainView] = useState(cm ? 'trends' : 'yours')
   const visibleClients = cm ? clients.filter((c) => c.id === cm) : clients
 

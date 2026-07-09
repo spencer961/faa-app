@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getClientMode } from '../lib/clientMode.js'
@@ -30,7 +31,8 @@ function getStaff(client) {
 const BLANK = { title: '', status: 'not_started', priority: 'medium', due_date: '', assignee: '', client_id: null, notes: '' }
 
 export default function Tasks() {
-  const cm = getClientMode()
+  const [searchParams] = useSearchParams()
+  const cm = (searchParams.get('client') ? parseInt(searchParams.get('client')) : null) || getClientMode()
   const [clients, setClients] = useState([])
   const [tasks, setTasks] = useState([])
   const [selId, setSelId] = useState(cm || 'personal')

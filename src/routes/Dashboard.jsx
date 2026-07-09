@@ -209,7 +209,8 @@ export default function Dashboard() {
             const openN = openTasks(c.id)
             const hp = clientHealth(c.id)
             const wk = clientWeekly(c.id)
-            const go = (e, path) => { e.stopPropagation(); navigate(path) }
+            // Open that client's page scoped to them, in a new tab (dashboard stays put).
+            const go = (e, path) => { e.stopPropagation(); window.open(window.location.href.split('#')[0] + '#' + path + '?client=' + c.id, '_blank') }
             return (
               <div key={c.id} onClick={() => setDetailId(c.id)} style={{ ...card, gridColumn: multi ? '1 / -1' : undefined }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
