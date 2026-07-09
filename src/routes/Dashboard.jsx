@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { aggregate, METRICS, fmtVal } from '../lib/metrics.js'
 import { health } from '../lib/successMap.js'
+import { DEFAULT_TIERS, TIER_PALETTE, getClientTiers as getTiers } from '../lib/tiers.js'
 
 // Command center — migrated from dashboard.html (Pass 1: client directory,
 // quick-launch links/files, and client info detail view).
@@ -54,18 +55,6 @@ const billingStatus = (billing, lastPay) => {
   const d = Math.floor((due - today) / 86400000); return { label: `Due in ${d} day${d !== 1 ? 's' : ''}`, color: MUTED }
 }
 
-// Membership tiers — a client can belong to several. The catalog lives in
-// app_state (so you can add your own); each client stores its tier ids at
-// info.tiers.
-const DEFAULT_TIERS = [
-  { id: 'consulting', name: '1-on-1 Consulting', color: '#0b1d5e' },
-  { id: 'community', name: 'Community', color: '#18a866' },
-  { id: 'lifetime', name: 'Lifetime All-Access', color: '#bc9762' },
-  { id: 'guides', name: 'Guides', color: '#9B7FE8' },
-  { id: 'prospect', name: 'Prospect', color: '#888786' },
-]
-const TIER_PALETTE = ['#1a7fd4', '#e07b0a', '#18a866', '#f0359a', '#9B7FE8', '#4a9e12', '#d42020', '#00b4d8', '#bc6c25']
-const getTiers = (c) => (Array.isArray(c?.info?.tiers) ? c.info.tiers : [])
 
 const INFO_FIELDS = [
   ['doctor', 'Doctor / primary contact'], ['timezone', 'Time zone'], ['website', 'Website'],
@@ -78,7 +67,6 @@ export default function Dashboard() {
   const [appData, setAppData] = useState({})
   const [filter, setFilter] = useState('all')
   const [tiers, setTiers] = useState(DEFAULT_TIERS)
-  const [tierFilter, setTierFilter] = useState('all')
   const [editMode, setEditMode] = useState(false)
   const [detailId, setDetailId] = useState(null)
   const [linkModal, setLinkModal] = useState(null) // {id?, clientId}
@@ -195,9 +183,12 @@ export default function Dashboard() {
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
   if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} toast={toast} />
 
+  // Dashboard = consulting cockpit: show consulting clients (and untagged
+  // ones, which default to consulting). Membership filtering lives in the
+  // Client Portal.
   const shown = clientMode
     ? clients.filter((c) => c.id === clientMode)
-    : clients.filter((c) => (filter === 'all' || String(c.id) === String(filter)) && (tierFilter === 'all' || getTiers(c).includes(tierFilter)))
+    : clients.filter((c) => (filter === 'all' || String(c.id) === String(filter)) && (getTiers(c).length === 0 || getTiers(c).includes('consulting')))
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
@@ -217,16 +208,9 @@ export default function Dashboard() {
       } />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
         {!clientMode && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
             <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All clients</button>
             {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} style={pill(String(filter) === String(c.id))}>{c.name}</button>)}
-          </div>
-        )}
-        {!clientMode && tiers.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-            <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Membership</span>
-            <button onClick={() => setTierFilter('all')} style={pill(tierFilter === 'all')}>All</button>
-            {tiers.map((t) => <button key={t.id} onClick={() => setTierFilter(t.id)} style={pill(tierFilter === t.id)}>{t.name}</button>)}
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>

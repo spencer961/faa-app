@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase.js'
 import { aggregate, METRICS, fmtVal } from '../lib/metrics.js'
 import { health, leafIds, CATS } from '../lib/successMap.js'
 import { getClientMode } from '../lib/clientMode.js'
+import { DEFAULT_TIERS, getClientTiers } from '../lib/tiers.js'
 
 // Client Portal — the client's-eye view. As admin you pick a client and
 // preview their portal; later, logins drop each client straight onto
@@ -15,6 +16,7 @@ const SL = { not_started: 'Not Started', in_progress: 'In Progress', waiting: 'W
 const SC = { not_started: '#888786', in_progress: '#1a7fd4', waiting: '#e07b0a', done: '#18a866' }
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
 const loadSnaps = () => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } }
+const pill = (active) => ({ padding: '5px 14px', border: '0.5px solid ' + (active ? GOLD : 'rgba(0,0,0,0.15)'), borderRadius: 999, background: active ? NAVY : '#fff', color: active ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' })
 
 export default function ClientPortal() {
   const [searchParams] = useSearchParams()
@@ -23,6 +25,8 @@ export default function ClientPortal() {
   const [tasks, setTasks] = useState([])
   const [metricsByClient, setMetricsByClient] = useState({})
   const [snaps] = useState(loadSnaps)
+  const [tiers, setTiers] = useState(DEFAULT_TIERS)
+  const [tierFilter, setTierFilter] = useState('all')
   const [selId, setSelId] = useState(locked)
 
   useEffect(() => {
@@ -37,6 +41,8 @@ export default function ClientPortal() {
         mrows.filter((r) => r.period === 'daily').forEach((r) => { by[r.client_id] = by[r.client_id] || {}; by[r.client_id][r.date_key] = r.data || {} })
         setMetricsByClient(by)
       }
+      const { data: st } = await supabase.from('app_state').select('data').eq('id', 'gmj_main').maybeSingle()
+      if (st?.data && Array.isArray(st.data.tiers) && st.data.tiers.length) setTiers(st.data.tiers)
     })()
   }, [])
 
@@ -50,19 +56,32 @@ export default function ClientPortal() {
         <Header sub="Client Portal" back="/" />
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 20px' }}>
           <h1 style={{ fontSize: 20, fontWeight: 600, color: TEXT, marginBottom: 4 }}>Client Portals</h1>
-          <p style={{ fontSize: 13, color: MUTED, marginBottom: 24 }}>Pick a client to preview the portal they see on their end.</p>
+          <p style={{ fontSize: 13, color: MUTED, marginBottom: 18 }}>Everyone across your memberships. Pick a client to preview the portal they see on their end.</p>
+          {tiers.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 22 }}>
+              <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Membership</span>
+              <button onClick={() => setTierFilter('all')} style={pill(tierFilter === 'all')}>All</button>
+              {tiers.map((t) => <button key={t.id} onClick={() => setTierFilter(t.id)} style={pill(tierFilter === t.id)}>{t.name}</button>)}
+            </div>
+          )}
           {!clients.length && <div style={{ color: MUTED, fontStyle: 'italic' }}>Loading clients…</div>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 14 }}>
-            {clients.map((c) => {
+            {clients.filter((c) => tierFilter === 'all' || getClientTiers(c).includes(tierFilter)).map((c) => {
               const hp = latestHealth(c.id)
+              const ct = getClientTiers(c)
               return (
                 <button key={c.id} onClick={() => setSelId(c.id)} style={{ ...CARD, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'inherit' }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>{ini(c.name)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
                     <div style={{ fontSize: 12, color: MUTED }}>{hp === null ? 'Not assessed' : hp + '% progress'}</div>
+                    {ct.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+                        {ct.map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <span key={id} style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 999, background: t.color + '1a', color: t.color }}>{t.name}</span> })}
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontSize: 12, color: GOLD, fontWeight: 600, flexShrink: 0 }}>View →</span>
+                  <span style={{ fontSize: 12, color: GOLD, fontWeight: 600, flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }}>View →</span>
                 </button>
               )
             })}
