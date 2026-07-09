@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -459,6 +459,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Short name</span>
           <input defaultValue={c.info?.abbr || ''} onBlur={(e) => onSaveAbbr(c.id, e.target.value)} placeholder={abbrOf({ name: c.name })} maxLength={8} style={{ width: 110, height: 30, padding: '0 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, color: TEXT, background: BG, fontFamily: 'inherit' }} />
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
+          <button onClick={() => document.getElementById('files-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginLeft: 'auto', height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: 'rgba(11,29,94,0.05)', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>View Files ↓</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           <InfoCard label="Doctor / primary contact" value={infoField(c, 'doctor') || c.doctor} />
@@ -468,31 +469,31 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <div style={{ gridColumn: '1 / -1' }}><StaffCard staff={staffObjs} /></div>
         </div>
         <NotesSection client={c} onSave={onSaveNotes} />
-        <div style={{ ...sectionCard, marginBottom: 16 }}>
-          <SectionTitle>Membership / tiers</SectionTitle>
-          <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Tag this client with every tier they belong to — they can be in more than one.</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {tiers.map((t) => { const on = getTiers(c).includes(t.id); return (
-              <button key={t.id} onClick={() => onToggleTier(c.id, t.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, border: '0.5px solid ' + (on ? t.color : 'rgba(0,0,0,0.15)'), background: on ? t.color + '1a' : '#fff', color: on ? t.color : MUTED }}>
-                {on && <span style={{ fontSize: 11 }}>✓</span>}{t.name}
-              </button>
-            )})}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'start' }}>
+          <div style={sectionCard}>
+            <SectionTitle>Membership / tiers</SectionTitle>
+            <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Tag this client with every tier they belong to.</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {tiers.map((t) => { const on = getTiers(c).includes(t.id); return (
+                <button key={t.id} onClick={() => onToggleTier(c.id, t.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, border: '0.5px solid ' + (on ? t.color : 'rgba(0,0,0,0.15)'), background: on ? t.color + '1a' : '#fff', color: on ? t.color : MUTED }}>
+                  {on && <span style={{ fontSize: 11 }}>✓</span>}{t.name}
+                </button>
+              )})}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <input style={{ ...inp, flex: 1 }} value={newTier} onChange={(e) => setNewTier(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (onAddTier(newTier), setNewTier(''))} placeholder="Add a tier (e.g. VIP)" />
+              <button style={btnPrimary} onClick={() => { onAddTier(newTier); setNewTier('') }}>Add tier</button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-            <input style={{ ...inp, flex: 1 }} value={newTier} onChange={(e) => setNewTier(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (onAddTier(newTier), setNewTier(''))} placeholder="Add a tier (e.g. VIP)" />
-            <button style={btnPrimary} onClick={() => { onAddTier(newTier); setNewTier('') }}>Add tier</button>
-          </div>
-        </div>
-        {(billing.monthlyAmount || lastPay) && (
-          <div style={{ ...sectionCard, marginBottom: 16 }}>
+          <div style={sectionCard}>
             <SectionTitle>Billing</SectionTitle>
-            <div style={{ display: 'flex', gap: 24, fontSize: 13, color: TEXT, flexWrap: 'wrap' }}>
-              {billing.monthlyAmount && <div><span style={{ color: MUTED }}>Monthly: </span>{money(billing.monthlyAmount)}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, fontSize: 13, color: TEXT }}>
+              {billing.monthlyAmount ? <div><span style={{ color: MUTED }}>Monthly: </span>{money(billing.monthlyAmount)}</div> : <div style={{ color: MUTED, fontStyle: 'italic' }}>No billing set yet.</div>}
               {billing.billingDay && <div><span style={{ color: MUTED }}>Bills on the {billing.billingDay} of each month</span></div>}
               {lastPay && <div><span style={{ color: MUTED }}>Last payment: </span>{money(lastPay.amount)} — {lastPay.fmt || lastPay.date}</div>}
             </div>
           </div>
-        )}
+        </div>
         <div style={{ ...sectionCard, marginBottom: 16 }}>
           <SectionTitle>Practices / locations</SectionTitle>
           <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Add each location, then tag a link to a location when you create it.</div>
@@ -513,7 +514,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <button onClick={addPractice} style={btnPrimary}>Add</button>
           </div>
         </div>
-        <div style={sectionCard}>
+        <div id="files-section" style={sectionCard}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <SectionTitle>Links & files ({shownLinks.length})</SectionTitle>
             <button onClick={() => setLinkEdit({ clientId: c.id })} style={{ ...addRow, width: 'auto', padding: '5px 12px' }}>+ Add link</button>
@@ -550,15 +551,18 @@ function StaffCard({ staff }) {
       {staff.length === 0 ? (
         <div style={{ fontSize: 13, color: '#c0c6d8', fontStyle: 'italic' }}>Not set</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {staff.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: TEXT }}>{s.name}</span>
-              {s.title && <span style={{ fontSize: 12, color: MUTED }}>{s.title}</span>}
-              {s.phone && <span style={{ fontSize: 12, color: MUTED }}>{s.phone}</span>}
-              {s.email && <a href={'mailto:' + s.email} style={{ fontSize: 12, color: NAVY, textDecoration: 'none' }}>{s.email}</a>}
-            </div>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,150px) minmax(0,120px) 130px minmax(0,1fr)', columnGap: 14, rowGap: 8, alignItems: 'center' }}>
+          {staff.map((s, i) => {
+            const cell = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+            return (
+              <Fragment key={i}>
+                <span style={{ ...cell, fontSize: 13, fontWeight: 500, color: TEXT }} title={s.name}>{s.name}</span>
+                <span style={{ ...cell, fontSize: 12, color: MUTED }} title={s.title}>{s.title || ''}</span>
+                <span style={{ ...cell, fontSize: 12, color: MUTED, display: 'flex', alignItems: 'center', gap: 4 }}>{s.phone ? (<><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg>{s.phone}</>) : ''}</span>
+                {s.email ? <a href={'mailto:' + s.email} style={{ ...cell, fontSize: 12, color: NAVY, textDecoration: 'none' }} title={s.email}>{s.email}</a> : <span />}
+              </Fragment>
+            )
+          })}
         </div>
       )}
     </div>
@@ -706,7 +710,7 @@ function NotesSection({ client: c, onSave }) {
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a note…" style={{ ...inp, flex: 1, height: 40, padding: '9px 10px', resize: 'vertical' }} />
         <button onClick={add} style={btnPrimary}>Add note</button>
       </div>
-      <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {notes.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No notes yet.</div>}
         {notes.map((n) => (
           <div key={n.id} style={{ background: BG, borderRadius: 8, padding: '10px 12px' }}>
