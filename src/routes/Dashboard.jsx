@@ -49,7 +49,7 @@ const parseStaff = (c) => {
   let s = c?.info?.staff ?? c?.info?.info?.staff
   if (!s) return []
   try { if (typeof s === 'string') s = JSON.parse(s) } catch { return [] }
-  return Array.isArray(s) ? s.map((x) => (typeof x === 'object' ? { name: x.name || '', title: x.title || x.role || '', email: x.email || '' } : { name: String(x), title: '', email: '' })) : []
+  return Array.isArray(s) ? s.map((x) => (typeof x === 'object' ? { name: x.name || '', title: x.title || x.role || '', phone: x.phone || '', email: x.email || '' } : { name: String(x), title: '', phone: '', email: '' })) : []
 }
 const PRACTICE_PALETTE = [
   { bg: '#E6F1FB', txt: '#0C447C' }, { bg: '#FAEEDA', txt: '#633806' }, { bg: '#E1F5EE', txt: '#085041' },
@@ -423,7 +423,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const [editOpen, setEditOpen] = useState(false)
   const info = c.info || {}
   const practices = getPractices(c)
-  const staff = staffList({ staff: infoField(c, 'staff') })
+  const staffObjs = parseStaff(c)
   const billing = info.billing || c.billing || {}
   const payments = Array.isArray(info.payments) ? [...info.payments].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : []
   const lastPay = payments[0]
@@ -450,10 +450,11 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-          {INFO_FIELDS.map(([k, label]) => (
-            <InfoCard key={k} label={label} value={infoField(c, k) || (k === 'doctor' ? c.doctor : '')} href={k === 'website' && infoField(c, 'website') ? websiteUrl(infoField(c, 'website')) : undefined} />
-          ))}
-          <InfoCard label="Staff / team" value={staff.length ? staff.map((s) => (typeof s === 'object' ? [s.name, s.role].filter(Boolean).join(' — ') : s)).join('\n') : ''} />
+          <InfoCard label="Doctor / primary contact" value={infoField(c, 'doctor') || c.doctor} />
+          <InfoCard label="Website" value={infoField(c, 'website')} href={infoField(c, 'website') ? websiteUrl(infoField(c, 'website')) : undefined} />
+          <InfoCard label="Time zone" value={infoField(c, 'timezone')} />
+          <InfoCard label="No. of locations" value={infoField(c, 'numLocations')} />
+          <div style={{ gridColumn: '1 / -1' }}><StaffCard staff={staffObjs} /></div>
         </div>
         <NotesSection client={c} onSave={onSaveNotes} />
         <div style={{ ...sectionCard, marginBottom: 16 }}>
@@ -484,6 +485,12 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
         <div style={{ ...sectionCard, marginBottom: 16 }}>
           <SectionTitle>Practices / locations</SectionTitle>
           <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Add each location, then tag a link to a location when you create it.</div>
+          {infoField(c, 'locations') && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Practice location names</div>
+              <div style={{ fontSize: 13, color: TEXT, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{infoField(c, 'locations')}</div>
+            </div>
+          )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {practices.length === 0 && <span style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No extra locations — this client has one practice.</span>}
             {practices.map((p) => { const pc = practiceColor(p); return (
@@ -515,6 +522,28 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
       {linkEdit && <LinkModal modal={linkEdit} link={linkEdit.id ? links.find((l) => l.id === linkEdit.id) : null} clients={clients} onSave={(f) => { onSaveLink(f); setLinkEdit(null) }} onDelete={(id) => { onDeleteLink(id); setLinkEdit(null) }} onClose={() => setLinkEdit(null)} />}
       {editOpen && <EditClientModal client={c} onSave={(f) => { onSaveClient(c.id, f); setEditOpen(false) }} onDelete={() => onDeleteClient(c.id)} onClose={() => setEditOpen(false)} />}
       {toast && <Toast msg={toast} />}
+    </div>
+  )
+}
+
+function StaffCard({ staff }) {
+  return (
+    <div style={{ background: '#fff', borderRadius: 8, padding: '12px 14px', border: '0.5px solid rgba(0,0,0,0.08)' }}>
+      <div style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: staff.length ? 8 : 6 }}>Staff / team</div>
+      {staff.length === 0 ? (
+        <div style={{ fontSize: 13, color: '#c0c6d8', fontStyle: 'italic' }}>Not set</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {staff.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: TEXT }}>{s.name}</span>
+              {s.title && <span style={{ fontSize: 12, color: MUTED }}>{s.title}</span>}
+              {s.phone && <span style={{ fontSize: 12, color: MUTED }}>{s.phone}</span>}
+              {s.email && <a href={'mailto:' + s.email} style={{ fontSize: 12, color: NAVY, textDecoration: 'none' }}>{s.email}</a>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -704,7 +733,7 @@ function EditClientModal({ client: c, onSave, onDelete, onClose }) {
       info: {
         doctor: f.doctor.trim(), timezone: f.timezone.trim(), website: f.website.trim(),
         numLocations: f.numLocations.trim(), locations: f.locations.trim(), notes: f.notes.trim(),
-        staff: staff.filter((s) => s.name.trim()).map((s) => ({ name: s.name.trim(), title: s.title.trim(), email: s.email.trim() })),
+        staff: staff.filter((s) => s.name.trim()).map((s) => ({ name: s.name.trim(), title: s.title.trim(), phone: s.phone.trim(), email: s.email.trim() })),
       },
     })
   }
@@ -727,12 +756,13 @@ function EditClientModal({ client: c, onSave, onDelete, onClose }) {
           {staff.map((s, i) => (
             <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input style={{ ...inp, flex: 1 }} value={s.name} placeholder="Name" onChange={(e) => setStaffRow(i, 'name', e.target.value)} />
-              <input style={{ ...inp, flex: 1 }} value={s.title} placeholder="Title" onChange={(e) => setStaffRow(i, 'title', e.target.value)} />
-              <input style={{ ...inp, flex: 1.4 }} value={s.email} placeholder="Email" onChange={(e) => setStaffRow(i, 'email', e.target.value)} />
+              <input style={{ ...inp, flex: 0.9 }} value={s.title} placeholder="Title" onChange={(e) => setStaffRow(i, 'title', e.target.value)} />
+              <input style={{ ...inp, flex: 0.9 }} value={s.phone} placeholder="Phone" onChange={(e) => setStaffRow(i, 'phone', e.target.value)} />
+              <input style={{ ...inp, flex: 1.3 }} value={s.email} placeholder="Email" onChange={(e) => setStaffRow(i, 'email', e.target.value)} />
               <button onClick={() => setStaff((st) => st.filter((_, idx) => idx !== i))} title="Remove" style={{ ...iconBtn, color: '#A32D2D', fontSize: 16 }}>×</button>
             </div>
           ))}
-          <button onClick={() => setStaff((st) => [...st, { name: '', title: '', email: '' }])} style={{ ...addRow, width: 'auto', alignSelf: 'flex-start', padding: '6px 12px' }}>+ Add staff</button>
+          <button onClick={() => setStaff((st) => [...st, { name: '', title: '', phone: '', email: '' }])} style={{ ...addRow, width: 'auto', alignSelf: 'flex-start', padding: '6px 12px' }}>+ Add staff</button>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }}>
           {!confirmDel ? (
