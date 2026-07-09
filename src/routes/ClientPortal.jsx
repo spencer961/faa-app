@@ -7,6 +7,7 @@ import { aggregate, METRICS, fmtVal } from '../lib/metrics.js'
 import { health, leafIds, CATS } from '../lib/successMap.js'
 import { getClientMode } from '../lib/clientMode.js'
 import { DEFAULT_TIERS, getClientTiers, MODULES, DEFAULT_TIER_ACCESS, accessForClient } from '../lib/tiers.js'
+import { isAdmin } from '../lib/auth.js'
 
 // Client Portal — the client's-eye view. As admin you pick a client and
 // preview their portal; later, logins drop each client straight onto
@@ -66,10 +67,10 @@ export default function ClientPortal() {
   if (!client) {
     return (
       <div style={{ minHeight: '100vh', background: BG }}>
-        <Header sub="Client Portal" back="/" right={
+        <Header sub="Client Portal" back="/" right={isAdmin() ? (
           <button onClick={() => setSettingsOpen(true)} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>⚙ Access settings</button>
-        } />
-        {settingsOpen && <AccessSettingsModal tiers={tiers} access={tierAccess} onSave={persistAccess} onClose={() => setSettingsOpen(false)} />}
+        ) : null} />
+        {isAdmin() && settingsOpen && <AccessSettingsModal tiers={tiers} access={tierAccess} onSave={persistAccess} onClose={() => setSettingsOpen(false)} />}
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 20px' }}>
           <h1 style={{ fontSize: 20, fontWeight: 600, color: TEXT, marginBottom: 4 }}>Client Portals</h1>
           <p style={{ fontSize: 13, color: MUTED, marginBottom: 18 }}>Everyone across your memberships. Pick a client to preview the portal they see on their end.</p>
