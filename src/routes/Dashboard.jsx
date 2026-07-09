@@ -103,8 +103,22 @@ export default function Dashboard() {
   const [metricsByClient, setMetricsByClient] = useState({})
   const [snaps] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } })
   const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, accounting: false, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true, accounting: false } } })
+  // Per-client card display overrides. { [clientId]: { todos, progress, metrics, accounting } }.
+  // A client here uses its own layer settings; everyone else falls back to the global `toggles`.
+  const [cardOverrides, setCardOverrides] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_card_overrides')) || {} } catch { return {} } })
+  const [selectSettings, setSelectSettings] = useState(false)
+  const [settingsScope, setSettingsScope] = useState('all')
   const navigate = useNavigate()
   const toggleLayer = (k) => setToggles((t) => { const n = { ...t, [k]: !t[k] }; try { localStorage.setItem('faa_dash_toggles', JSON.stringify(n)) } catch { /* ignore */ } return n })
+  // Set one layer, either globally ("all") or for a single client (per-client override).
+  const setCardSetting = (scope, key, value) => {
+    if (scope === 'all') {
+      setToggles((t) => { const n = { ...t, [key]: value }; try { localStorage.setItem('faa_dash_toggles', JSON.stringify(n)) } catch { /* ignore */ } return n })
+    } else {
+      setCardOverrides((o) => { const base = o[scope] || { ...toggles }; const n = { ...o, [scope]: { ...base, [key]: value } }; try { localStorage.setItem('faa_card_overrides', JSON.stringify(n)) } catch { /* ignore */ } return n })
+    }
+  }
+  const resetClientOverride = (clientId) => setCardOverrides((o) => { const n = { ...o }; delete n[clientId]; try { localStorage.setItem('faa_card_overrides', JSON.stringify(n)) } catch { /* ignore */ } return n })
 
   useEffect(() => {
     ;(async () => {
@@ -311,6 +325,7 @@ export default function Dashboard() {
             // Open that client's page scoped to them, in a new tab (dashboard stays put).
             const go = (e, path) => { e.stopPropagation(); window.open(window.location.href.split('#')[0] + '#' + path + '?client=' + c.id, '_blank') }
             const web = websiteUrl(infoField(c, 'website'))
+            const ct = cardOverrides[c.id] || toggles
             return (
               <div key={c.id} onClick={() => setDetailId(c.id)} style={{ ...card, gridColumn: multi ? '1 / -1' : undefined }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -328,17 +343,12 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                {toggles.todos && openN > 0 && (
+                {ct.todos && openN > 0 && (
                   <div style={{ marginBottom: 10 }}>
                     <span onClick={(e) => go(e, '/tasks')} title="Open to-dos" style={{ display: 'inline-block', background: 'rgba(188,151,98,0.15)', color: '#8a6a3c', border: '0.5px solid rgba(188,151,98,0.4)', borderRadius: 999, fontSize: 11, fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>{openN} to-do{openN !== 1 ? 's' : ''}</span>
                   </div>
                 )}
-                {getTiers(c).length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-                    {getTiers(c).map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <span key={id} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: t.color + '1a', color: t.color, border: '0.5px solid ' + t.color + '55' }}>{t.name}</span> })}
-                  </div>
-                )}
-                {toggles.progress && (
+                {ct.progress && (
                   <div onClick={(e) => go(e, '/success-map')} style={{ marginBottom: 10, cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
                       <span style={{ color: MUTED }}>Progress</span>
@@ -349,7 +359,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                {toggles.metrics && (
+                {ct.metrics && (
                   <div onClick={(e) => go(e, '/metrics')} style={{ display: 'flex', gap: 6, marginBottom: 10, cursor: 'pointer' }}>
                     {[['Leads', wk ? wk.leads : '—'], ['Closed', wk ? wk.closed : '—'], ['Revenue', wk ? fmtVal(M('total_revenue'), wk.revenue, true) : '—']].map(([l, v]) => (
                       <div key={l} style={{ flex: 1, background: BG, borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
@@ -372,7 +382,12 @@ export default function Dashboard() {
                   </div>
                   {editMode && <button onClick={(e) => { e.stopPropagation(); setLinkModal({ clientId: c.id, practice: activePrac || '' }) }} style={addRow}>+ Add link</button>}
                 </div>
-                {toggles.accounting && !clientMode && (() => {
+                {getTiers(c).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 12, paddingTop: 10, borderTop: '0.5px solid rgba(0,0,0,0.06)' }}>
+                    {getTiers(c).map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <span key={id} title={t.name} style={{ width: 11, height: 11, borderRadius: '50%', background: t.color, flexShrink: 0, cursor: 'default', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }} /> })}
+                  </div>
+                )}
+                {ct.accounting && !clientMode && (() => {
                   const billing = c.info?.billing || c.billing || {}
                   const payments = Array.isArray(c.info?.payments) ? c.info.payments : []
                   const lastPay = [...payments].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]
@@ -406,8 +421,41 @@ export default function Dashboard() {
       {selectModal && (
         <div onClick={() => setSelectModal(false)} style={overlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 420 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY, marginBottom: 6 }}>Select a client</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY }}>Select a client</h3>
+              <button onClick={() => setSelectSettings((s) => !s)} title="Card display settings" aria-label="Card display settings" style={{ width: 30, height: 30, borderRadius: 7, border: '0.5px solid rgba(0,0,0,0.12)', background: selectSettings ? '#f2f4f8' : '#fff', color: NAVY, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+              </button>
+            </div>
             <p style={{ fontSize: 12, color: MUTED, marginBottom: 16, lineHeight: 1.6 }}>Client Mode shows only this client — everyone else is hidden. Use it when screen-sharing.</p>
+            {selectSettings && (() => {
+              const eff = settingsScope === 'all' ? toggles : (cardOverrides[settingsScope] || toggles)
+              const layers = [['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']]
+              return (
+                <div style={{ background: '#f7f6f4', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: MUTED, marginBottom: 8 }}>Card display</div>
+                  <label style={{ display: 'block', fontSize: 12, color: TEXT, marginBottom: 10 }}>
+                    Apply to
+                    <select value={settingsScope} onChange={(e) => setSettingsScope(e.target.value)} style={{ ...inp, marginTop: 4 }}>
+                      <option value="all">All clients</option>
+                      {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{cardOverrides[c.id] ? ' (custom)' : ''}</option>)}
+                    </select>
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {layers.map(([k, label]) => (
+                      <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT, cursor: 'pointer', padding: '4px 0' }}>
+                        <input type="checkbox" checked={!!eff[k]} onChange={(e) => setCardSetting(settingsScope, k, e.target.checked)} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  {settingsScope !== 'all' && cardOverrides[settingsScope] && (
+                    <button onClick={() => resetClientOverride(settingsScope)} style={{ ...btnGhost, marginTop: 10, fontSize: 11, padding: '5px 10px' }}>Reset to global defaults</button>
+                  )}
+                  <p style={{ fontSize: 11, color: MUTED, marginTop: 10, lineHeight: 1.5 }}>{settingsScope === 'all' ? 'Applies to every card that doesn’t have its own custom setting.' : 'Overrides the global setting for this client only.'}</p>
+                </div>
+              )
+            })()}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
               {clients.map((c) => (
                 <button key={c.id} onClick={() => enterClientMode(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
