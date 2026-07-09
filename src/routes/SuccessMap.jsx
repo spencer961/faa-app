@@ -4,6 +4,7 @@ import { NAVY, GOLD, BG, BORDER, TEXT, MUTED, CARD, INP, BTNP, BTNS } from '../l
 import { supabase } from '../lib/supabase.js'
 import { CATS, SC, CYCLE, leafIds, pScore, health, initScores } from '../lib/successMap.js'
 import { DSEC } from '../lib/onboardingSections.js'
+import { getClientMode } from '../lib/clientMode.js'
 
 // Success Map — migrated from portal.html. Consultant scores each client
 // red/yellow/green across categories; health % = share of green items.
@@ -23,12 +24,16 @@ export default function SuccessMap() {
   const [selM, setSelM] = useState(null)
   const [exp, setExp] = useState({})
   const [ass, setAss] = useState({ scores: {}, label: '', notes: '' })
+  const cm = getClientMode()
 
   useEffect(() => {
     supabase.from('clients').select('id,name,doctor,email,status,info').order('id').then(({ data }) => {
       if (Array.isArray(data)) setClients(data.map((r) => ({ ...r, answers: r.info || {} })))
     })
   }, [])
+
+  // Client Mode: lock straight to that client's map.
+  useEffect(() => { if (cm) { setSelId(cm); setView('client') } }, [cm])
 
   const client = clients.find((c) => c.id === selId)
   const clientSnaps = (id) => [...(snaps[id] || [])].sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -51,7 +56,7 @@ export default function SuccessMap() {
   if (view === 'assessment' && client) return <Assessment client={client} ass={ass} setAss={setAss} cycleScore={cycleScore} onCancel={() => setView(clientSnaps(selId).length ? 'client' : 'home')} onPublish={publish} />
   if (view === 'form' && client) return <FormReview client={client} snaps={clientSnaps(selId)} onBack={() => setView('home')} onAssess={() => startAssessment(selId)} />
   if (view === 'client' && client) return <ClientMap client={client} snaps={clientSnaps(selId)} selM={selM} setSelM={setSelM} exp={exp} setExp={setExp} onBack={() => { setView('home'); setSelM(null) }} onAssess={(prefill) => startAssessment(selId, prefill)} onForm={() => setView('form')} />
-  return <HomeView clients={clients} snaps={snaps} onOpen={(id) => { setSelId(id); setSelM(null); setView('client') }} onForm={(id) => { setSelId(id); setView('form') }} onAssess={startAssessment} />
+  return <HomeView clients={cm ? clients.filter((c) => c.id === cm) : clients} snaps={snaps} onOpen={(id) => { setSelId(id); setSelM(null); setView('client') }} onForm={(id) => { setSelId(id); setView('form') }} onAssess={startAssessment} />
 }
 
 // ── HOME ────────────────────────────────────────────────────────────────

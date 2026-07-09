@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Chart from 'chart.js/auto'
 import Header from '../components/Header.jsx'
 import { supabase, SUPABASE_URL, SB_HEADERS } from '../lib/supabase.js'
+import { getClientMode } from '../lib/clientMode.js'
 import {
   METRICS, KEY_METRICS, INPUT_METRICS, fmtVal, benchClass, aggregate, bucketDaily, getWeekEnding, getMonthKey,
 } from '../lib/metrics.js'
@@ -29,7 +30,9 @@ const mkLabel = (k, period) => period === 'monthly' ? new Date(k + '-01T12:00:00
 export default function Metrics() {
   const [clients, setClients] = useState([])
   const [data, setData] = useState({}) // {clientId:{period:{dateKey:{metricId:value}}}}
-  const [mainView, setMainView] = useState('yours')
+  const cm = getClientMode()
+  const [mainView, setMainView] = useState(cm ? 'trends' : 'yours')
+  const visibleClients = cm ? clients.filter((c) => c.id === cm) : clients
 
   useEffect(() => {
     ;(async () => {
@@ -63,9 +66,9 @@ export default function Metrics() {
         }
       />
       <div className="main">
-        {mainView === 'yours' && <YoursView clients={clients} data={data} />}
-        {mainView === 'client' && <ClientView clients={clients} data={data} setData={setData} />}
-        {mainView === 'trends' && <TrendsView clients={clients} data={data} />}
+        {mainView === 'yours' && <YoursView clients={visibleClients} data={data} />}
+        {mainView === 'client' && <ClientView clients={visibleClients} data={data} setData={setData} />}
+        {mainView === 'trends' && <TrendsView clients={visibleClients} data={data} />}
       </div>
     </div>
   )

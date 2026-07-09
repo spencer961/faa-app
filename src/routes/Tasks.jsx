@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Header from '../components/Header.jsx'
 import { supabase } from '../lib/supabase.js'
+import { getClientMode } from '../lib/clientMode.js'
 
 // Task manager — migrated from todo.html. Personal + per-client tasks,
 // grouped by status / priority / all. Reads clients & tasks from Supabase.
@@ -29,9 +30,10 @@ function getStaff(client) {
 const BLANK = { title: '', status: 'not_started', priority: 'medium', due_date: '', assignee: '', client_id: null, notes: '' }
 
 export default function Tasks() {
+  const cm = getClientMode()
   const [clients, setClients] = useState([])
   const [tasks, setTasks] = useState([])
-  const [selId, setSelId] = useState('personal')
+  const [selId, setSelId] = useState(cm || 'personal')
   const [view, setView] = useState('status')
   const [editing, setEditing] = useState(null) // task object, {} for new, or null when closed
   const [toast, setToast] = useState('')
@@ -105,14 +107,18 @@ export default function Tasks() {
       <Header sub="· To-Do Lists" back="/" />
       <div className="layout">
         <div className="sidebar">
-          <div className="sb-section">Personal</div>
-          <div className={'sb-item' + (selId === 'personal' ? ' active' : '')} onClick={() => setSelId('personal')}>
-            <span className="sb-dot" style={{ background: '#bc9762' }} />
-            <span className="sb-name">My Tasks</span>
-            {openCount('personal') > 0 && <span className="sb-badge">{openCount('personal')}</span>}
-          </div>
+          {!cm && (
+            <>
+              <div className="sb-section">Personal</div>
+              <div className={'sb-item' + (selId === 'personal' ? ' active' : '')} onClick={() => setSelId('personal')}>
+                <span className="sb-dot" style={{ background: '#bc9762' }} />
+                <span className="sb-name">My Tasks</span>
+                {openCount('personal') > 0 && <span className="sb-badge">{openCount('personal')}</span>}
+              </div>
+            </>
+          )}
           <div className="sb-section" style={{ marginTop: 4 }}>Clients</div>
-          {clients.map((c, i) => (
+          {(cm ? clients.filter((c) => c.id === cm) : clients).map((c, i) => (
             <div key={c.id} className={'sb-item' + (selId === c.id ? ' active' : '')} onClick={() => setSelId(c.id)}>
               <span className="sb-dot" style={{ background: accent(c, i) }} />
               <span className="sb-name">{c.name}</span>
