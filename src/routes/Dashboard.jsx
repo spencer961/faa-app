@@ -384,7 +384,7 @@ export default function Dashboard() {
                 </div>
                 {getTiers(c).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 12, paddingTop: 10, borderTop: '0.5px solid rgba(0,0,0,0.06)' }}>
-                    {getTiers(c).map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <span key={id} title={t.name} style={{ width: 11, height: 11, borderRadius: '50%', background: t.color, flexShrink: 0, cursor: 'default', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }} /> })}
+                    {getTiers(c).map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <TierDot key={id} name={t.name} color={t.color} /> })}
                   </div>
                 )}
                 {ct.accounting && !clientMode && (() => {
@@ -483,6 +483,26 @@ export default function Dashboard() {
       )}
       {toast && <Toast msg={toast} />}
     </div>
+  )
+}
+
+// A tier badge: a small colored dot with a custom tooltip that appears instantly on hover.
+function TierDot({ name, color }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <span
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ position: 'relative', display: 'inline-flex', width: 11, height: 11, flexShrink: 0 }}
+    >
+      <span style={{ width: 11, height: 11, borderRadius: '50%', background: color, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)', cursor: 'default' }} />
+      {hover && (
+        <span style={{ position: 'absolute', bottom: 'calc(100% + 7px)', left: '50%', transform: 'translateX(-50%)', background: NAVY, color: '#fff', fontSize: 11, fontWeight: 500, lineHeight: 1, whiteSpace: 'nowrap', padding: '5px 8px', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', pointerEvents: 'none', zIndex: 50 }}>
+          {name}
+          <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: `4px solid ${NAVY}` }} />
+        </span>
+      )}
+    </span>
   )
 }
 

@@ -14,7 +14,8 @@
       "Bash(gh auth *)",
       "Bash(git -C \"/Users/bobbiejohealey/Documents/FAA/Full-Arch-App\" remote -v)",
       "Bash(git -C \"/Users/bobbiejohealey/Documents/FAA/Full-Arch-App\" config user.name)",
-      "Bash(git commit -q -m 'Dashboard: tier badges as hover-dot badges + per-client card display settings *)"
+      "Bash(git commit -q -m 'Dashboard: tier badges as hover-dot badges + per-client card display settings *)",
+      "Bash(git commit -q -m 'Dashboard: tier dots use a custom instant tooltip instead of native title *)"
     ]
   }
 }
