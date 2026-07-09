@@ -216,7 +216,7 @@ function PortalView({ client, tasks, snaps, metricsByClient, tierAccess, adminBa
             <div style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Your tools</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
               {tools.map((t) => (
-                <Link key={t.to} to={t.to} style={{ ...CARD, display: 'block', borderLeft: '4px solid ' + GOLD }}>
+                <Link key={t.to} to={t.to} target="_blank" rel="noopener" style={{ ...CARD, display: 'block', borderLeft: '4px solid ' + GOLD }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: NAVY, marginBottom: 3 }}>{t.name} →</div>
                   <div style={{ fontSize: 12, color: MUTED }}>{t.desc}</div>
                 </Link>

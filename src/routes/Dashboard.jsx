@@ -83,7 +83,7 @@ export default function Dashboard() {
   const [appData, setAppData] = useState({})
   const [filter, setFilter] = useState('all')
   const [tiers, setTiers] = useState(DEFAULT_TIERS)
-  const [compactFilter, setCompactFilter] = useState(() => { try { return localStorage.getItem('faa_dash_compact') === '1' } catch { return false } })
+  const [compactFilter, setCompactFilter] = useState(() => { try { const v = localStorage.getItem('faa_dash_compact'); return v === null ? true : v === '1' } catch { return true } })
   const [editMode, setEditMode] = useState(false)
   const [detailId, setDetailId] = useState(null)
   const [linkModal, setLinkModal] = useState(null) // {id?, clientId}
@@ -213,7 +213,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} toast={toast} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -406,7 +406,7 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, toast }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
@@ -445,8 +445,8 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <InfoCard key={k} label={label} value={infoField(c, k) || (k === 'doctor' ? c.doctor : '')} />
           ))}
           <InfoCard label="Staff / team" value={staff.length ? staff.map((s) => (typeof s === 'object' ? [s.name, s.role].filter(Boolean).join(' — ') : s)).join('\n') : ''} />
-          <InfoCard label="Notes" value={infoField(c, 'notes') || ''} />
         </div>
+        <NotesSection client={c} onSave={onSaveNotes} />
         <div style={{ ...sectionCard, marginBottom: 16 }}>
           <SectionTitle>Membership / tiers</SectionTitle>
           <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Tag this client with every tier they belong to — they can be in more than one.</div>
@@ -621,6 +621,61 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
   )
 }
 
+function NotesSection({ client: c, onSave }) {
+  const raw = () => (Array.isArray(c.info?.notesLog) ? c.info.notesLog : [])
+  const notes = [...raw()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const [draft, setDraft] = useState('')
+  const [editId, setEditId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [histId, setHistId] = useState(null)
+  const fmt = (iso) => { try { const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) } catch { return '' } }
+  const add = () => { const t = draft.trim(); if (!t) return; onSave(c.id, [...raw(), { id: 'n' + Date.now(), text: t, createdAt: new Date().toISOString(), editedAt: null, history: [] }]); setDraft('') }
+  const saveEdit = (id) => { const t = editText.trim(); if (!t) return; onSave(c.id, raw().map((n) => (n.id === id ? { ...n, text: t, editedAt: new Date().toISOString(), history: [...(n.history || []), { text: n.text, date: n.editedAt || n.createdAt }] } : n))); setEditId(null) }
+  const del = (id) => onSave(c.id, raw().filter((n) => n.id !== id))
+  return (
+    <div style={{ ...sectionCard, marginBottom: 16 }}>
+      <SectionTitle>Notes</SectionTitle>
+      <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a note…" style={{ ...inp, flex: 1, height: 40, padding: '9px 10px', resize: 'vertical' }} />
+        <button onClick={add} style={btnPrimary}>Add note</button>
+      </div>
+      <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {notes.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No notes yet.</div>}
+        {notes.map((n) => (
+          <div key={n.id} style={{ background: BG, borderRadius: 8, padding: '10px 12px' }}>
+            {editId === n.id ? (
+              <div>
+                <textarea value={editText} onChange={(e) => setEditText(e.target.value)} style={{ ...inp, width: '100%', height: 60, padding: '8px 10px', resize: 'vertical' }} />
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                  <button onClick={() => setEditId(null)} style={{ ...btnGhost, height: 28 }}>Cancel</button>
+                  <button onClick={() => saveEdit(n.id)} style={{ ...btnPrimary, height: 28 }}>Save</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.text}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: MUTED }}>{fmt(n.createdAt)}{n.editedAt ? ' · edited ' + fmt(n.editedAt) : ''}</span>
+                  <button onClick={() => { setEditId(n.id); setEditText(n.text) }} style={noteLink}>Edit</button>
+                  {n.history && n.history.length > 0 && <button onClick={() => setHistId(histId === n.id ? null : n.id)} style={noteLink}>History ({n.history.length})</button>}
+                  <button onClick={() => del(n.id)} style={{ ...noteLink, color: '#A32D2D' }}>Delete</button>
+                </div>
+                {histId === n.id && (
+                  <div style={{ marginTop: 8, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {[...(n.history || [])].reverse().map((h, i) => (
+                      <div key={i}><div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>{fmt(h.date)}</div><div style={{ fontSize: 12, color: MUTED, whiteSpace: 'pre-wrap' }}>{h.text}</div></div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function EditClientModal({ client: c, onSave, onDelete, onClose }) {
   const [f, setF] = useState({
     name: c.name || '', doctor: c.doctor || infoField(c, 'doctor') || '', email: c.email || infoField(c, 'email') || '',
@@ -720,6 +775,7 @@ const card = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', border
 const sectionCard = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '18px 20px' }
 const addRow = { display: 'flex', alignItems: 'center', gap: 5, padding: '6px 9px', border: '0.5px dashed rgba(0,0,0,0.2)', borderRadius: 8, color: MUTED, fontSize: 12, cursor: 'pointer', background: 'none', width: '100%', fontFamily: 'inherit' }
 const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: MUTED, padding: '2px 4px', fontSize: 13, lineHeight: 1 }
+const noteLink = { background: 'none', border: 'none', padding: 0, color: NAVY, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }
 const inp = { width: '100%', height: 34, padding: '0 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, color: TEXT, background: BG, fontFamily: 'inherit' }
 const btnGhost = { height: 34, padding: '0 16px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, background: 'transparent', color: MUTED, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
 const btnPrimary = { height: 34, padding: '0 18px', border: 'none', borderRadius: 8, background: NAVY, color: GOLD, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }
