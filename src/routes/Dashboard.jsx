@@ -54,6 +54,7 @@ export default function Dashboard() {
   const [linkModal, setLinkModal] = useState(null) // {id?, clientId}
   const [toast, setToast] = useState('')
   const [tasks, setTasks] = useState([])
+  const [cardPractice, setCardPractice] = useState({}) // {clientId: activePracticeName}
   const [metricsByClient, setMetricsByClient] = useState({})
   const [snaps] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } })
   const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true } } })
@@ -143,7 +144,10 @@ export default function Dashboard() {
           {shown.map((c) => {
             const cl = links.filter((l) => l.clientId === c.id)
             const accent = c.info?.accentColor || c.accentColor || GOLD
-            const meta = [c.doctor || c.info?.doctor, c.info?.timezone ? c.info.timezone.split('—')[0].trim() : ''].filter(Boolean).join(' · ')
+            const meta = [infoField(c, 'doctor') || c.doctor, infoField(c, 'timezone') ? infoField(c, 'timezone').split('—')[0].trim() : ''].filter(Boolean).join(' · ')
+            const practices = getPractices(c)
+            const activePrac = cardPractice[c.id] || null
+            const cvis = cl.filter((l) => !activePrac || !l.practice || l.practice === activePrac)
             const openN = openTasks(c.id)
             const hp = clientHealth(c.id)
             const wk = clientWeekly(c.id)
@@ -184,10 +188,16 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
+                {practices.length > 0 && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                    <button onClick={() => setCardPractice((m) => ({ ...m, [c.id]: null }))} style={cardTab(activePrac === null)}>All</button>
+                    {practices.map((p) => <button key={p} onClick={() => setCardPractice((m) => ({ ...m, [c.id]: p }))} style={cardTab(activePrac === p)}>{p}</button>)}
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {cl.length === 0 && <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic', padding: '2px 0' }}>No files yet</div>}
-                  {cl.map((l) => <LinkChip key={l.id} l={l} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
-                  {editMode && <button onClick={(e) => { e.stopPropagation(); setLinkModal({ clientId: c.id }) }} style={addRow}>+ Add link</button>}
+                  {cvis.length === 0 && <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic', padding: '2px 0' }}>{activePrac ? 'No files for this location' : 'No files yet'}</div>}
+                  {cvis.map((l) => <LinkChip key={l.id} l={l} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
+                  {editMode && <button onClick={(e) => { e.stopPropagation(); setLinkModal({ clientId: c.id, practice: activePrac || '' }) }} style={addRow}>+ Add link</button>}
                 </div>
               </div>
             )
@@ -305,7 +315,7 @@ function InfoCard({ label, value }) {
 }
 
 function LinkModal({ modal, link, clients, onSave, onDelete, onClose }) {
-  const [form, setForm] = useState({ id: link?.id, label: link?.label || '', category: link?.category || '', url: link?.url || '', clientId: link?.clientId ?? modal.clientId, practice: link?.practice || '' })
+  const [form, setForm] = useState({ id: link?.id, label: link?.label || '', category: link?.category || '', url: link?.url || '', clientId: link?.clientId ?? modal.clientId, practice: link?.practice || modal.practice || '' })
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const practices = getPractices(clients.find((c) => c.id === form.clientId))
   return (
@@ -343,6 +353,7 @@ const SectionTitle = ({ children }) => <div style={{ fontSize: 14, fontWeight: 5
 const Toast = ({ msg }) => <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: NAVY, color: '#fff', fontSize: 12, padding: '8px 18px', borderRadius: 20, zIndex: 9999 }}>{msg}</div>
 
 const pill = (active) => ({ padding: '5px 14px', border: '0.5px solid ' + (active ? GOLD : 'rgba(0,0,0,0.15)'), borderRadius: 999, background: active ? NAVY : '#fff', color: active ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer' })
+const cardTab = (active) => ({ padding: '3px 9px', borderRadius: 6, border: '0.5px solid ' + (active ? NAVY : 'rgba(0,0,0,0.12)'), background: active ? NAVY : '#fff', color: active ? '#fff' : MUTED, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' })
 const card = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '16px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column' }
 const sectionCard = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '18px 20px' }
 const addRow = { display: 'flex', alignItems: 'center', gap: 5, padding: '6px 9px', border: '0.5px dashed rgba(0,0,0,0.2)', borderRadius: 8, color: MUTED, fontSize: 12, cursor: 'pointer', background: 'none', width: '100%', fontFamily: 'inherit' }
