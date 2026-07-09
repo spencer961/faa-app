@@ -25,7 +25,8 @@
       "Bash(git commit -q -m 'Metrics: use exact spreadsheet names for every metric *)",
       "mcp__visualize__read_me",
       "mcp__visualize__show_widget",
-      "Bash(git commit -q -m 'Metrics: daily entry becomes a clean single-column list *)"
+      "Bash(git commit -q -m 'Metrics: daily entry becomes a clean single-column list *)",
+      "Bash(git commit -q -m 'Metrics: add Month sheet view for bulk paste entry *)"
     ]
   }
 }

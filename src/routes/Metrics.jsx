@@ -194,7 +194,7 @@ function ClientView({ clients, data, setData }) {
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <div className="seg-ctrl">
-            {['daily', 'weekly', 'monthly'].map((p) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{p[0].toUpperCase() + p.slice(1)}</button>)}
+            {[['daily', 'Daily'], ['monthsheet', 'Month sheet'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([p, label]) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{label}</button>)}
           </div>
         </div>
       </div>
@@ -242,11 +242,112 @@ function ClientView({ clients, data, setData }) {
             })()}
           </div>
         </div>
+      ) : period === 'monthsheet' ? (
+        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} />
       ) : (
         <AggView daily={data[cid]?.daily || {}} period={period} />
       )}
       {toast && <div className="toast show">{toast}</div>}
     </>
+  )
+}
+
+// ── MONTH SHEET ────────────────────────────────────────────────────────
+// Full month as a spreadsheet: metrics down the left, weekdays across the top.
+// Built for bulk entry — paste a block straight from the client's Google Sheet
+// and it drops into the matching cells (computed gold rows are left untouched).
+const monthShift = (mk, delta) => { const [y, mo] = mk.split('-').map(Number); const dt = new Date(y, mo - 1 + delta, 1); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') }
+const weekdaysOf = (mk) => { const [y, mo] = mk.split('-').map(Number); const last = new Date(y, mo, 0).getDate(); const out = []; for (let d = 1; d <= last; d++) { const dt = new Date(y, mo - 1, d); const wd = dt.getDay(); if (wd >= 1 && wd <= 5) out.push(mk + '-' + String(d).padStart(2, '0')) } return out }
+const dayHdr = (dk) => new Date(dk + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+function MonthGrid({ cid, clients, data, setData }) {
+  const [monthKey, setMonthKey] = useState(today().slice(0, 7))
+  const [grid, setGrid] = useState({})
+  const [dirty, setDirty] = useState(false)
+  const [toast, setToast] = useState('')
+  const days = weekdaysOf(monthKey)
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
+
+  useEffect(() => {
+    const daily = data[cid]?.daily || {}
+    const g = {}
+    weekdaysOf(monthKey).forEach((dk) => { g[dk] = { ...(daily[dk] || {}) } })
+    setGrid(g); setDirty(false)
+  }, [cid, monthKey, data])
+
+  const setCell = (dk, mid, v) => { setGrid((g) => ({ ...g, [dk]: { ...(g[dk] || {}), [mid]: v } })); setDirty(true) }
+
+  // Paste a spreadsheet block: rows = metrics, columns = days, anchored at the target cell.
+  const onPaste = (e, mIndex, dIndex) => {
+    const text = e.clipboardData.getData('text')
+    if (!text) return
+    e.preventDefault()
+    const matrix = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map((r) => r.split('\t'))
+    setGrid((g) => {
+      const ng = { ...g }
+      matrix.forEach((rowVals, i) => {
+        const metric = METRICS[mIndex + i]
+        if (!metric || metric.calc) return // never write into computed gold rows
+        rowVals.forEach((raw, j) => {
+          const dk = days[dIndex + j]
+          if (!dk) return
+          const clean = String(raw).trim().replace(/[$,%\s]/g, '')
+          ng[dk] = { ...(ng[dk] || {}), [metric.id]: clean }
+        })
+      })
+      return ng
+    })
+    setDirty(true)
+  }
+
+  async function save() {
+    const client = clients.find((c) => c.id === cid)
+    const rows = []
+    Object.entries(grid).forEach(([dk, vals]) => {
+      const clean = {}
+      INPUT_METRICS.forEach((m) => { const v = vals[m.id]; if (v !== '' && v !== undefined && v !== null) clean[m.id] = parseFloat(v) || 0 })
+      if (Object.keys(clean).length) rows.push({ client_id: cid, client_name: client?.name || '', period: 'daily', date_key: dk, data: clean, responsible: {}, updated_at: new Date().toISOString() })
+    })
+    if (!rows.length) { showToast('Nothing to save'); return }
+    await fetch(`${SUPABASE_URL}/rest/v1/metrics_tracker`, { method: 'POST', headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) })
+    setData((md) => { const daily = { ...(md[cid]?.daily || {}) }; rows.forEach((r) => { daily[r.date_key] = r.data }); return { ...md, [cid]: { ...(md[cid] || {}), daily } } })
+    setDirty(false); showToast('Saved ' + rows.length + ' day' + (rows.length !== 1 ? 's' : '') + ' ✓')
+  }
+
+  const bodyRows = []
+  let lastSec = null
+  METRICS.forEach((m, mi) => {
+    if (m.section !== lastSec) { lastSec = m.section; bodyRows.push(<tr key={'sec_' + m.section} className="gt-sec"><td colSpan={days.length + 1}>{SEC_LABEL[m.section] || m.section}</td></tr>) }
+    bodyRows.push(
+      <tr key={m.id} className={m.calc ? 'gt-gold' : ''}>
+        <td className="gt-name" title={m.hint || ''}>{m.label}{m.calc && <span className="auto-tag">auto</span>}</td>
+        {days.map((dk, di) => m.calc
+          ? <td key={dk} className="gt-cell gt-out">{fmtVal(m, m.calc(grid[dk] || {}))}</td>
+          : <td key={dk} className="gt-cell"><input className="gt-input" type="number" value={grid[dk]?.[m.id] ?? ''} onChange={(e) => setCell(dk, m.id, e.target.value)} onPaste={(e) => onPaste(e, mi, di)} onFocus={(e) => e.target.select()} /></td>
+        )}
+      </tr>
+    )
+  })
+
+  return (
+    <div className="entry-card">
+      <div className="entry-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="nav-btn" onClick={() => setMonthKey(monthShift(monthKey, -1))} title="Previous month">‹</button>
+          <span style={{ fontSize: 13, fontWeight: 500, minWidth: 130, textAlign: 'center' }}>{new Date(monthKey + '-01T12:00:00').toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
+          <button className="nav-btn" onClick={() => setMonthKey(monthShift(monthKey, 1))} title="Next month">›</button>
+        </div>
+        <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save all' : 'Saved ✓'}</button>
+      </div>
+      <div className="gt-note"><span>Paste rows straight from your spreadsheet — click the first day’s cell for a metric, then paste. Gold rows total up automatically.</span></div>
+      <div className="gt-scroll">
+        <table className="grid-table">
+          <thead><tr><th className="gt-name-h">Daily metric</th>{days.map((dk) => <th key={dk} className="gt-day-h">{dayHdr(dk)}</th>)}</tr></thead>
+          <tbody>{bodyRows}</tbody>
+        </table>
+      </div>
+      {toast && <div className="toast show">{toast}</div>}
+    </div>
   )
 }
 
@@ -422,6 +523,21 @@ const CSS = `
 .mx .sheet-input{width:92px;height:34px;border:0.5px solid rgba(0,0,0,0.12);border-radius:7px;background:#fff;text-align:right;font-size:16px;font-weight:600;color:#1a1a1a;padding:0 10px;font-variant-numeric:tabular-nums;}
 .mx .sheet-input:focus{border-color:#0b1d5e;outline:none;box-shadow:0 0 0 3px rgba(11,29,94,0.08);}
 .mx .sheet-input::placeholder{color:#cfcecb;font-weight:500;}
+.mx .gt-note{padding:10px 16px;font-size:12px;color:#888786;background:#f9f9f8;border-bottom:0.5px solid rgba(0,0,0,0.06);line-height:1.4;}
+.mx .gt-scroll{overflow-x:auto;}
+.mx .grid-table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;}
+.mx .grid-table th,.mx .grid-table td{border-bottom:0.5px solid rgba(0,0,0,0.06);border-right:0.5px solid rgba(0,0,0,0.05);}
+.mx .gt-name-h,.mx .gt-name{position:sticky;left:0;z-index:2;background:#fff;text-align:left;min-width:210px;max-width:210px;padding:7px 12px;font-size:12px;color:#1a1a1a;}
+.mx .gt-name-h{z-index:3;background:#f9f9f8;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#888786;}
+.mx .gt-name .auto-tag{margin-left:6px;}
+.mx .gt-day-h{min-width:64px;padding:7px 6px;font-size:11px;font-weight:600;color:#888786;background:#f9f9f8;text-align:center;white-space:nowrap;position:sticky;top:0;}
+.mx .gt-cell{padding:0;text-align:center;height:34px;}
+.mx .gt-input{width:64px;height:33px;border:none;background:transparent;text-align:center;font-size:13px;color:#1a1a1a;padding:0 4px;font-variant-numeric:tabular-nums;}
+.mx .gt-input:focus{outline:2px solid #0b1d5e;outline-offset:-2px;background:#fbfcff;}
+.mx .gt-sec td{background:#f2f1ee;padding:5px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#888786;position:sticky;left:0;}
+.mx .gt-gold td{background:#FAEEDA;}
+.mx .gt-gold .gt-name{background:#FAEEDA;color:#633806;}
+.mx .gt-out{font-size:12px;font-weight:600;color:#633806;padding:0 6px;text-align:center;white-space:nowrap;}
 .mx .progress-wrap{display:flex;align-items:center;gap:7px;}
 .mx .progress-bar{width:70px;height:6px;border-radius:3px;background:#eceae7;overflow:hidden;}
 .mx .progress-fill{height:100%;background:#0b1d5e;border-radius:3px;transition:width .3s;}
