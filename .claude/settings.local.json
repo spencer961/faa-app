@@ -19,7 +19,8 @@
       "Read(//Users/bobbiejohealey/Documents/FAA/**)",
       "Bash(git commit -q -m 'Dashboard: remove placeholder accent dot + add By client/category/queue views *)",
       "Bash(git commit -q -m 'Dashboard: remove Work queue view, keep By client + By category *)",
-      "Bash(git commit -q -m 'Dashboard: separate View / Filter / Show on cards into distinct labeled panels *)"
+      "Bash(git commit -q -m 'Dashboard: separate View / Filter / Show on cards into distinct labeled panels *)",
+      "Bash(git commit -q -m 'Dashboard: move Show on cards beside View switcher, drop control labels *)"
     ]
   }
 }
