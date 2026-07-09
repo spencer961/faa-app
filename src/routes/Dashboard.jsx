@@ -92,6 +92,7 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState([])
   const [cardPractice, setCardPractice] = useState({}) // {clientId: activePracticeName}
   const [accModal, setAccModal] = useState(null) // {type:'record'|'history'|'billing', clientId}
+  const [undo, setUndo] = useState(null) // { clientId, restore }
   const [clientMode, setClientMode] = useState(() => { try { const v = localStorage.getItem('faa_client_mode'); return v ? parseInt(v) : null } catch { return null } })
   const [selectModal, setSelectModal] = useState(false)
   const [endModal, setEndModal] = useState(false)
@@ -159,6 +160,8 @@ export default function Dashboard() {
   async function patchInfo(clientId, patch) {
     const c = clients.find((x) => x.id === clientId)
     if (!c) return
+    const prev = { name: c.name, doctor: c.doctor, email: c.email, info: c.info }
+    setUndo({ clientId, restore: async () => { setClients((cs) => cs.map((x) => (x.id === clientId ? { ...x, ...prev } : x))); await supabase.from('clients').update({ ...prev, updated_at: new Date().toISOString() }).eq('id', clientId) } })
     const info = { ...(c.info || {}), ...patch }
     setClients((cs) => cs.map((x) => (x.id === clientId ? { ...x, info } : x)))
     await supabase.from('clients').update({ info, updated_at: new Date().toISOString() }).eq('id', clientId)
@@ -177,11 +180,19 @@ export default function Dashboard() {
   }
   async function saveClient(id, fields) {
     const c = clients.find((x) => x.id === id); if (!c) return
+    const prev = { name: c.name, doctor: c.doctor, email: c.email, info: c.info }
+    setUndo({ clientId: id, restore: async () => { setClients((cs) => cs.map((x) => (x.id === id ? { ...x, ...prev } : x))); await supabase.from('clients').update({ ...prev, updated_at: new Date().toISOString() }).eq('id', id) } })
     const info = { ...(c.info || {}), ...fields.info }
     const patch = { name: fields.name, doctor: fields.doctor || null, email: fields.email || null, info }
     setClients((cs) => cs.map((x) => (x.id === id ? { ...x, ...patch } : x)))
     await supabase.from('clients').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
     showToast('Client saved ✓')
+  }
+  async function undoLast() {
+    if (!undo) return
+    await undo.restore()
+    setUndo(null)
+    showToast('Change undone ↩')
   }
   async function deleteClient(id) {
     await supabase.from('clients').delete().eq('id', id)
@@ -214,7 +225,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -284,8 +295,8 @@ export default function Dashboard() {
                     {meta && <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{meta}</div>}
                   </div>
                   {web && (
-                    <button onClick={(e) => { e.stopPropagation(); window.open(web, '_blank') }} title="Open website" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, border: '0.5px solid rgba(0,0,0,0.12)', background: BG, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: NAVY }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                    <button onClick={(e) => { e.stopPropagation(); window.open(web, '_blank') }} title="Open website" style={{ flexShrink: 0, width: 22, height: 22, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b3b1ad', padding: 0 }}>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
                     </button>
                   )}
                 </div>
@@ -415,7 +426,7 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, canUndo, onUndo, toast }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
@@ -518,6 +529,12 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             {shownLinks.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => onDeleteLink(l.id)} />)}
           </div>
         </div>
+        {canUndo && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, padding: '12px 18px', background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 12 }}>
+            <span style={{ fontSize: 13, color: MUTED }}>✓ Your last change was saved automatically.</span>
+            <button onClick={onUndo} style={{ ...btnGhost, height: 32 }}>↩ Undo last change</button>
+          </div>
+        )}
       </div>
       {linkEdit && <LinkModal modal={linkEdit} link={linkEdit.id ? links.find((l) => l.id === linkEdit.id) : null} clients={clients} onSave={(f) => { onSaveLink(f); setLinkEdit(null) }} onDelete={(id) => { onDeleteLink(id); setLinkEdit(null) }} onClose={() => setLinkEdit(null)} />}
       {editOpen && <EditClientModal client={c} onSave={(f) => { onSaveClient(c.id, f); setEditOpen(false) }} onDelete={() => onDeleteClient(c.id)} onClose={() => setEditOpen(false)} />}
@@ -601,6 +618,7 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
   const [note, setNote] = useState('')
   const [monthly, setMonthly] = useState(billing.monthlyAmount || '')
   const [billingDay, setBillingDay] = useState(billing.billingDay || '')
+  const [confirmPay, setConfirmPay] = useState(null)
   const total = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
   const byMonth = {}
   payments.forEach((p) => { const k = (p.date || '').slice(0, 7); if (k) byMonth[k] = (byMonth[k] || 0) + (parseFloat(p.amount) || 0) })
@@ -647,7 +665,15 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
             {payments.map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
                 <div><div style={{ fontSize: 13, fontWeight: 500, color: TEXT }}>{money(p.amount)}</div><div style={{ fontSize: 11, color: MUTED }}>{p.fmt || p.date}{p.note ? ' · ' + p.note : ''}</div></div>
-                <button onClick={() => onDeletePayment(client.id, p)} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12 }}>Delete</button>
+                {confirmPay === i ? (
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: '#A32D2D' }}>Delete?</span>
+                    <button onClick={() => setConfirmPay(null)} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 12 }}>No</button>
+                    <button onClick={() => { onDeletePayment(client.id, p); setConfirmPay(null) }} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Yes</button>
+                  </span>
+                ) : (
+                  <button onClick={() => setConfirmPay(i)} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 12 }}>Delete</button>
+                )}
               </div>
             ))}
           </div>
@@ -668,6 +694,7 @@ function NotesSection({ client: c, onSave }) {
   const [editId, setEditId] = useState(null)
   const [editText, setEditText] = useState('')
   const [histId, setHistId] = useState(null)
+  const [confirmDelId, setConfirmDelId] = useState(null)
   const fmt = (iso) => { try { const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) } catch { return '' } }
   const add = () => { const t = draft.trim(); if (!t) return; onSave(c.id, [...raw(), { id: 'n' + Date.now(), text: t, createdAt: new Date().toISOString(), editedAt: null, history: [] }]); setDraft('') }
   const saveEdit = (id) => { const t = editText.trim(); if (!t) return; onSave(c.id, raw().map((n) => (n.id === id ? { ...n, text: t, editedAt: new Date().toISOString(), history: [...(n.history || []), { text: n.text, date: n.editedAt || n.createdAt }] } : n))); setEditId(null) }
@@ -698,7 +725,15 @@ function NotesSection({ client: c, onSave }) {
                   <span style={{ fontSize: 11, color: MUTED }}>{fmt(n.createdAt)}{n.editedAt ? ' · edited ' + fmt(n.editedAt) : ''}</span>
                   <button onClick={() => { setEditId(n.id); setEditText(n.text) }} style={noteLink}>Edit</button>
                   {n.history && n.history.length > 0 && <button onClick={() => setHistId(histId === n.id ? null : n.id)} style={noteLink}>History ({n.history.length})</button>}
-                  <button onClick={() => del(n.id)} style={{ ...noteLink, color: '#A32D2D' }}>Delete</button>
+                  {confirmDelId === n.id ? (
+                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: '#A32D2D' }}>Delete this note?</span>
+                      <button onClick={() => setConfirmDelId(null)} style={noteLink}>No</button>
+                      <button onClick={() => { del(n.id); setConfirmDelId(null) }} style={{ ...noteLink, color: '#A32D2D' }}>Yes</button>
+                    </span>
+                  ) : (
+                    <button onClick={() => setConfirmDelId(n.id)} style={{ ...noteLink, color: '#A32D2D' }}>Delete</button>
+                  )}
                 </div>
                 {histId === n.id && (
                   <div style={{ marginTop: 8, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
