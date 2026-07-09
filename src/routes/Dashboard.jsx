@@ -26,6 +26,14 @@ const CAT_PALETTE = [
 ]
 const catColor = (cat) => { let h = 0; for (const ch of String(cat || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return CAT_PALETTE[h % CAT_PALETTE.length] }
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+// Short name for the compact filter: a custom info.abbr if set, else the
+// acronym of the client's name.
+const abbrOf = (c) => {
+  if (c?.info?.abbr && c.info.abbr.trim()) return c.info.abbr.trim()
+  const words = String(c?.name || '').split(/\s+/).filter(Boolean)
+  if (words.length <= 1) return (words[0] || '').slice(0, 6).toUpperCase()
+  return words.map((w) => w[0].toUpperCase()).join('').slice(0, 6)
+}
 const money = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const staffList = (info) => { let s = info?.staff; if (!s) return []; try { if (typeof s === 'string') s = JSON.parse(s) } catch { return [String(info.staff)] } return Array.isArray(s) ? s : [s] }
 
@@ -67,6 +75,7 @@ export default function Dashboard() {
   const [appData, setAppData] = useState({})
   const [filter, setFilter] = useState('all')
   const [tiers, setTiers] = useState(DEFAULT_TIERS)
+  const [compactFilter, setCompactFilter] = useState(() => { try { return localStorage.getItem('faa_dash_compact') === '1' } catch { return false } })
   const [editMode, setEditMode] = useState(false)
   const [detailId, setDetailId] = useState(null)
   const [linkModal, setLinkModal] = useState(null) // {id?, clientId}
@@ -102,6 +111,7 @@ export default function Dashboard() {
   }, [])
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
+  const toggleCompact = () => setCompactFilter((v) => { const n = !v; try { localStorage.setItem('faa_dash_compact', n ? '1' : '0') } catch { /* ignore */ } return n })
   const enterClientMode = (id) => { setClientMode(id); try { localStorage.setItem('faa_client_mode', String(id)) } catch { /* ignore */ } setSelectModal(false); setDetailId(null); setEditMode(false) }
   const exitClientMode = () => { setClientMode(null); try { localStorage.removeItem('faa_client_mode') } catch { /* ignore */ } setEndModal(false) }
 
@@ -181,7 +191,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} toast={toast} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -208,9 +218,10 @@ export default function Dashboard() {
       } />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
         {!clientMode && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-            <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All clients</button>
-            {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} style={pill(String(filter) === String(c.id))}>{c.name}</button>)}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, alignItems: 'center' }}>
+            <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>{compactFilter ? 'All' : 'All clients'}</button>
+            {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} title={compactFilter ? c.name : undefined} style={pill(String(filter) === String(c.id))}>{compactFilter ? abbrOf(c) : c.name}</button>)}
+            <button onClick={toggleCompact} title="Toggle abbreviated client names" style={{ height: 28, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: 'transparent', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>{compactFilter ? '↔ Full names' : '↔ Abbreviate'}</button>
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
@@ -373,7 +384,7 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, onSaveAbbr, toast }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
@@ -397,6 +408,11 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</span><span style={{ width: 8, height: 8, borderRadius: '50%', background: accent }} /></div>
             <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>{c.email || info.email || ''}</div>
           </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Short name</span>
+          <input defaultValue={c.info?.abbr || ''} onBlur={(e) => onSaveAbbr(c.id, e.target.value)} placeholder={abbrOf({ name: c.name })} maxLength={8} style={{ width: 110, height: 30, padding: '0 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, color: TEXT, background: BG, fontFamily: 'inherit' }} />
+          <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           {INFO_FIELDS.map(([k, label]) => (
