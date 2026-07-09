@@ -54,6 +54,19 @@ const billingStatus = (billing, lastPay) => {
   const d = Math.floor((due - today) / 86400000); return { label: `Due in ${d} day${d !== 1 ? 's' : ''}`, color: MUTED }
 }
 
+// Membership tiers — a client can belong to several. The catalog lives in
+// app_state (so you can add your own); each client stores its tier ids at
+// info.tiers.
+const DEFAULT_TIERS = [
+  { id: 'consulting', name: '1-on-1 Consulting', color: '#0b1d5e' },
+  { id: 'community', name: 'Community', color: '#18a866' },
+  { id: 'lifetime', name: 'Lifetime All-Access', color: '#bc9762' },
+  { id: 'guides', name: 'Guides', color: '#9B7FE8' },
+  { id: 'prospect', name: 'Prospect', color: '#888786' },
+]
+const TIER_PALETTE = ['#1a7fd4', '#e07b0a', '#18a866', '#f0359a', '#9B7FE8', '#4a9e12', '#d42020', '#00b4d8', '#bc6c25']
+const getTiers = (c) => (Array.isArray(c?.info?.tiers) ? c.info.tiers : [])
+
 const INFO_FIELDS = [
   ['doctor', 'Doctor / primary contact'], ['timezone', 'Time zone'], ['website', 'Website'],
   ['numLocations', 'No. of locations'], ['locations', 'Practice location names'],
@@ -64,6 +77,8 @@ export default function Dashboard() {
   const [links, setLinks] = useState([])
   const [appData, setAppData] = useState({})
   const [filter, setFilter] = useState('all')
+  const [tiers, setTiers] = useState(DEFAULT_TIERS)
+  const [tierFilter, setTierFilter] = useState('all')
   const [editMode, setEditMode] = useState(false)
   const [detailId, setDetailId] = useState(null)
   const [linkModal, setLinkModal] = useState(null) // {id?, clientId}
@@ -86,7 +101,7 @@ export default function Dashboard() {
       const { data: cs } = await supabase.from('clients').select('*').order('id')
       if (Array.isArray(cs)) setClients(cs.map((r) => ({ ...r, info: r.info || {} })))
       const { data: st } = await supabase.from('app_state').select('data').eq('id', STATE_ID).maybeSingle()
-      if (st?.data) { setAppData(st.data); if (Array.isArray(st.data.links)) setLinks(st.data.links) }
+      if (st?.data) { setAppData(st.data); if (Array.isArray(st.data.links)) setLinks(st.data.links); if (Array.isArray(st.data.tiers) && st.data.tiers.length) setTiers(st.data.tiers) }
       const { data: ts } = await supabase.from('tasks').select('client_id,status')
       if (Array.isArray(ts)) setTasks(ts)
       const { data: mrows } = await supabase.from('metrics_tracker').select('client_id,period,date_key,data')
@@ -154,15 +169,35 @@ export default function Dashboard() {
     showToast('Client added ✓')
   }
 
+  async function persistTiers(next) {
+    setTiers(next)
+    const data = { ...appData, tiers: next }
+    setAppData(data)
+    await supabase.from('app_state').upsert({ id: STATE_ID, data, updated_at: new Date().toISOString() })
+  }
+  const addTier = (name) => {
+    const nm = (name || '').trim(); if (!nm) return
+    const id = nm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || ('tier' + tiers.length)
+    if (tiers.some((t) => t.id === id)) { showToast('That tier already exists'); return }
+    persistTiers([...tiers, { id, name: nm, color: TIER_PALETTE[tiers.length % TIER_PALETTE.length] }])
+  }
+  const toggleClientTier = (clientId, tierId) => {
+    const c = clients.find((x) => x.id === clientId); if (!c) return
+    const cur = getTiers(c)
+    patchInfo(clientId, { tiers: cur.includes(tierId) ? cur.filter((x) => x !== tierId) : [...cur, tierId] })
+  }
+
   const M = (id) => METRICS.find((m) => m.id === id)
   const openTasks = (cid) => tasks.filter((t) => t.client_id === cid && t.status !== 'done').length
   const clientHealth = (cid) => { const s = snaps[cid] || []; if (!s.length) return null; const latest = [...s].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-1)[0]; return health(latest.scores) }
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onAddTier={addTier} toast={toast} />
 
-  const shown = clientMode ? clients.filter((c) => c.id === clientMode) : (filter === 'all' ? clients : clients.filter((c) => String(c.id) === String(filter)))
+  const shown = clientMode
+    ? clients.filter((c) => c.id === clientMode)
+    : clients.filter((c) => (filter === 'all' || String(c.id) === String(filter)) && (tierFilter === 'all' || getTiers(c).includes(tierFilter)))
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
@@ -182,9 +217,16 @@ export default function Dashboard() {
       } />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
         {!clientMode && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
             <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All clients</button>
             {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} style={pill(String(filter) === String(c.id))}>{c.name}</button>)}
+          </div>
+        )}
+        {!clientMode && tiers.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+            <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Membership</span>
+            <button onClick={() => setTierFilter('all')} style={pill(tierFilter === 'all')}>All</button>
+            {tiers.map((t) => <button key={t.id} onClick={() => setTierFilter(t.id)} style={pill(tierFilter === t.id)}>{t.name}</button>)}
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
@@ -226,6 +268,11 @@ export default function Dashboard() {
                     <span onClick={(e) => go(e, '/tasks')} title="Open to-dos" style={{ flexShrink: 0, background: 'rgba(188,151,98,0.15)', color: '#8a6a3c', border: '0.5px solid rgba(188,151,98,0.4)', borderRadius: 999, fontSize: 11, fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>{openN} to-do{openN !== 1 ? 's' : ''}</span>
                   )}
                 </div>
+                {getTiers(c).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                    {getTiers(c).map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <span key={id} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: t.color + '1a', color: t.color, border: '0.5px solid ' + t.color + '55' }}>{t.name}</span> })}
+                  </div>
+                )}
                 {toggles.progress && (
                   <div onClick={(e) => go(e, '/success-map')} style={{ marginBottom: 10, cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
@@ -342,10 +389,11 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onAddTier, toast }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
+  const [newTier, setNewTier] = useState('')
   const info = c.info || {}
   const practices = getPractices(c)
   const staff = staffList({ staff: infoField(c, 'staff') })
@@ -372,6 +420,21 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           ))}
           <InfoCard label="Staff / team" value={staff.length ? staff.map((s) => (typeof s === 'object' ? [s.name, s.role].filter(Boolean).join(' — ') : s)).join('\n') : ''} />
           <InfoCard label="Notes" value={infoField(c, 'notes') || ''} />
+        </div>
+        <div style={{ ...sectionCard, marginBottom: 16 }}>
+          <SectionTitle>Membership / tiers</SectionTitle>
+          <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Tag this client with every tier they belong to — they can be in more than one.</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {tiers.map((t) => { const on = getTiers(c).includes(t.id); return (
+              <button key={t.id} onClick={() => onToggleTier(c.id, t.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, border: '0.5px solid ' + (on ? t.color : 'rgba(0,0,0,0.15)'), background: on ? t.color + '1a' : '#fff', color: on ? t.color : MUTED }}>
+                {on && <span style={{ fontSize: 11 }}>✓</span>}{t.name}
+              </button>
+            )})}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+            <input style={{ ...inp, flex: 1 }} value={newTier} onChange={(e) => setNewTier(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (onAddTier(newTier), setNewTier(''))} placeholder="Add a tier (e.g. VIP)" />
+            <button style={btnPrimary} onClick={() => { onAddTier(newTier); setNewTier('') }}>Add tier</button>
+          </div>
         </div>
         {(billing.monthlyAmount || lastPay) && (
           <div style={{ ...sectionCard, marginBottom: 16 }}>
