@@ -6,6 +6,7 @@ import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { aggregate, METRICS, fmtVal } from '../lib/metrics.js'
 import { health } from '../lib/successMap.js'
 import { DEFAULT_TIERS, TIER_PALETTE, getClientTiers as getTiers } from '../lib/tiers.js'
+import { DSEC } from '../lib/onboardingSections.js'
 
 // Command center — migrated from dashboard.html (Pass 1: client directory,
 // quick-launch links/files, and client info detail view).
@@ -93,6 +94,8 @@ export default function Dashboard() {
   const [cardPractice, setCardPractice] = useState({}) // {clientId: activePracticeName}
   const [accModal, setAccModal] = useState(null) // {type:'record'|'history'|'billing', clientId}
   const [undo, setUndo] = useState(null) // { clientId, restore }
+  const [submissions, setSubmissions] = useState([])
+  const [inboxOpen, setInboxOpen] = useState(false)
   const [clientMode, setClientMode] = useState(() => { try { const v = localStorage.getItem('faa_client_mode'); return v ? parseInt(v) : null } catch { return null } })
   const [selectModal, setSelectModal] = useState(false)
   const [endModal, setEndModal] = useState(false)
@@ -111,6 +114,8 @@ export default function Dashboard() {
       if (st?.data) { setAppData(st.data); if (Array.isArray(st.data.links)) setLinks(st.data.links); if (Array.isArray(st.data.tiers) && st.data.tiers.length) setTiers(st.data.tiers) }
       const { data: ts } = await supabase.from('tasks').select('client_id,status')
       if (Array.isArray(ts)) setTasks(ts)
+      const { data: subs } = await supabase.from('onboarding_submissions').select('*').order('submitted_at', { ascending: false })
+      if (Array.isArray(subs)) setSubmissions(subs)
       const { data: mrows } = await supabase.from('metrics_tracker').select('client_id,period,date_key,data')
       if (Array.isArray(mrows)) {
         const by = {}
@@ -202,6 +207,24 @@ export default function Dashboard() {
     showToast('Client deleted')
   }
 
+  // Turn an onboarding submission into a dashboard client. Seeds the client's
+  // info with the onboarding answers (so their Success Map has the basis) and
+  // tags them as a consulting client.
+  async function addClientFromSubmission(sub) {
+    const a = sub.answers || {}
+    const info = { ...a, doctor: a.doctorName || '', tiers: ['consulting'] }
+    const { data } = await supabase.from('clients').insert({ name: a.practiceName || sub.practice_name || 'New client', doctor: a.doctorName || null, email: a.email || sub.email || null, status: 'active', info }).select()
+    if (data?.[0]) setClients((cs) => [...cs, { ...data[0], info: data[0].info || {} }])
+    await supabase.from('onboarding_submissions').update({ reviewed: true }).eq('id', sub.id)
+    setSubmissions((ss) => ss.map((s) => (s.id === sub.id ? { ...s, reviewed: true, linked_client_id: data?.[0]?.id } : s)))
+    showToast('Client added from onboarding ✓')
+  }
+  async function dismissSubmission(sub) {
+    await supabase.from('onboarding_submissions').update({ reviewed: true }).eq('id', sub.id)
+    setSubmissions((ss) => ss.map((s) => (s.id === sub.id ? { ...s, reviewed: true } : s)))
+    showToast('Dismissed')
+  }
+
   async function persistTiers(next) {
     setTiers(next)
     const data = { ...appData, tiers: next }
@@ -244,7 +267,11 @@ export default function Dashboard() {
             Client Mode: {clients.find((c) => c.id === clientMode)?.name || ''}
           </button>
         ) : (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={() => setInboxOpen(true)} title="Onboarding submissions" style={{ position: 'relative', width: 34, height: 34, borderRadius: 7, border: '0.5px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>
+              {submissions.filter((s) => !s.reviewed).length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, background: '#d42020', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '1.5px solid #0b1d5e' }}>{submissions.filter((s) => !s.reviewed).length}</span>}
+            </button>
             <button onClick={() => setAddClientModal(true)} style={{ background: GOLD, border: 'none', color: NAVY, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>+ Client</button>
             <button onClick={() => setSelectModal(true)} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Client Mode</button>
             <button onClick={() => setEditMode((e) => !e)} style={{ background: editMode ? GOLD : 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: editMode ? NAVY : 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>{editMode ? 'Done editing' : 'Edit links'}</button>
@@ -375,6 +402,7 @@ export default function Dashboard() {
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
       {addClientModal && <AddClientModal onClose={() => setAddClientModal(false)} onSave={addClient} />}
+      {inboxOpen && <SubmissionsModal submissions={submissions} onAdd={addClientFromSubmission} onDismiss={dismissSubmission} onClose={() => setInboxOpen(false)} />}
       {selectModal && (
         <div onClick={() => setSelectModal(false)} style={overlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 420 }}>
@@ -845,6 +873,76 @@ function EditClientModal({ client: c, onSave, onDelete, onClose }) {
           <button onClick={onClose} style={btnGhost}>Cancel</button>
           <button onClick={save} style={btnPrimary}>Save profile</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SubmissionsModal({ submissions, onAdd, onDismiss, onClose }) {
+  const [reviewSub, setReviewSub] = useState(null)
+  const pending = submissions.filter((s) => !s.reviewed)
+  const done = submissions.filter((s) => s.reviewed)
+  const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) } catch { return '' } }
+
+  if (reviewSub) {
+    const a = reviewSub.answers || {}
+    return (
+      <div onClick={onClose} style={overlay}>
+        <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 640 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <button onClick={() => setReviewSub(null)} style={{ ...btnGhost, height: 30 }}>← Back</button>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY }}>{a.practiceName || reviewSub.practice_name || 'Submission'}</h3>
+          </div>
+          <p style={{ fontSize: 12, color: MUTED, marginBottom: 14 }}>Submitted {fmtDate(reviewSub.submitted_at)}{a.email || reviewSub.email ? ' · ' + (a.email || reviewSub.email) : ''}</p>
+          <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {DSEC.map((sec) => {
+              const fields = sec.fields.filter((f) => { const v = a[f.id]; return v && !(Array.isArray(v) && !v.length) })
+              if (!fields.length) return null
+              return (
+                <div key={sec.id}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{sec.title}</div>
+                  {fields.map((f) => { const v = a[f.id]; return (
+                    <div key={f.id} style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: MUTED, marginBottom: 2 }}>{f.label}</div>
+                      <div style={{ fontSize: 13, color: TEXT, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{Array.isArray(v) ? v.join(', ') : v}</div>
+                    </div>
+                  )})}
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }}>
+            {reviewSub.linked_client_id ? <span style={{ fontSize: 12, color: '#3B6D11', marginRight: 'auto' }}>✓ Added as client</span> : reviewSub.reviewed ? <span style={{ fontSize: 12, color: MUTED, marginRight: 'auto' }}>Reviewed</span> : <button onClick={() => { onDismiss(reviewSub); setReviewSub(null) }} style={{ ...btnGhost, marginRight: 'auto', color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)' }}>Dismiss</button>}
+            <button onClick={onClose} style={btnGhost}>Close</button>
+            {!reviewSub.linked_client_id && <button onClick={() => { onAdd(reviewSub); setReviewSub(null) }} style={btnPrimary}>Add as client →</button>}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const row = (s, muted) => (
+    <button key={s.id} onClick={() => setReviewSub(s)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', opacity: muted ? 0.6 : 1 }}>
+      {!muted && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d42020', flexShrink: 0 }} />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{s.answers?.practiceName || s.practice_name || 'Unknown practice'}</div>
+        <div style={{ fontSize: 11, color: MUTED }}>{(s.answers?.email || s.email || '')}{s.submitted_at ? ' · ' + fmtDate(s.submitted_at) : ''}{s.linked_client_id ? ' · added' : ''}</div>
+      </div>
+      <span style={{ fontSize: 12, color: NAVY, flexShrink: 0 }}>Review →</span>
+    </button>
+  )
+
+  return (
+    <div onClick={onClose} style={overlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 480 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY, marginBottom: 4 }}>Onboarding submissions</h3>
+        <p style={{ fontSize: 12, color: MUTED, marginBottom: 16 }}>New consulting clients who filled the onboarding form. Review and add them to the dashboard.</p>
+        {pending.length === 0 && done.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No submissions yet.</div>}
+        {pending.length > 0 && <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, marginBottom: 6 }}>New · {pending.length}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: done.length ? 16 : 0 }}>{pending.map((s) => row(s, false))}</div>
+        {done.length > 0 && <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, marginBottom: 6 }}>Reviewed</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>{done.slice(0, 20).map((s) => row(s, true))}</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}><button onClick={onClose} style={btnGhost}>Close</button></div>
       </div>
     </div>
   )
