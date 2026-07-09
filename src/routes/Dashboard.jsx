@@ -189,7 +189,7 @@ export default function Dashboard() {
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Show on cards</span>
-          {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].map(([k, label]) => (
+          {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].filter(([k]) => !(clientMode && k === 'accounting')).map(([k, label]) => (
             <button key={k} onClick={() => toggleLayer(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, border: '0.5px solid ' + (toggles[k] ? NAVY : 'rgba(0,0,0,0.15)'), background: toggles[k] ? 'rgba(11,29,94,0.05)' : '#fff', color: toggles[k] ? NAVY : MUTED, fontSize: 12, cursor: 'pointer' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
             </button>
