@@ -71,6 +71,9 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState([])
   const [cardPractice, setCardPractice] = useState({}) // {clientId: activePracticeName}
   const [accModal, setAccModal] = useState(null) // {type:'record'|'history'|'billing', clientId}
+  const [clientMode, setClientMode] = useState(() => { try { const v = localStorage.getItem('faa_client_mode'); return v ? parseInt(v) : null } catch { return null } })
+  const [selectModal, setSelectModal] = useState(false)
+  const [endModal, setEndModal] = useState(false)
   const [metricsByClient, setMetricsByClient] = useState({})
   const [snaps] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } })
   const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, accounting: false, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true, accounting: false } } })
@@ -95,6 +98,8 @@ export default function Dashboard() {
   }, [])
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
+  const enterClientMode = (id) => { setClientMode(id); try { localStorage.setItem('faa_client_mode', String(id)) } catch { /* ignore */ } setSelectModal(false); setDetailId(null); setEditMode(false) }
+  const exitClientMode = () => { setClientMode(null); try { localStorage.removeItem('faa_client_mode') } catch { /* ignore */ } setEndModal(false) }
 
   async function persistLinks(next) {
     setLinks(next)
@@ -148,18 +153,30 @@ export default function Dashboard() {
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
   if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} toast={toast} />
 
-  const shown = filter === 'all' ? clients : clients.filter((c) => String(c.id) === String(filter))
+  const shown = clientMode ? clients.filter((c) => c.id === clientMode) : (filter === 'all' ? clients : clients.filter((c) => String(c.id) === String(filter)))
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Command Center" back="/" right={
-        <button onClick={() => setEditMode((e) => !e)} style={{ background: editMode ? GOLD : 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: editMode ? NAVY : 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>{editMode ? 'Done editing' : 'Edit links'}</button>
+        clientMode ? (
+          <button onClick={() => setEndModal(true)} title="You're in Client Mode — click to end" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(24,168,102,0.18)', border: '0.5px solid rgba(24,168,102,0.55)', color: '#fff', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
+            Client Mode: {clients.find((c) => c.id === clientMode)?.name || ''}
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setSelectModal(true)} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Client Mode</button>
+            <button onClick={() => setEditMode((e) => !e)} style={{ background: editMode ? GOLD : 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: editMode ? NAVY : 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>{editMode ? 'Done editing' : 'Edit links'}</button>
+          </div>
+        )
       } />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-          <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All clients</button>
-          {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} style={pill(String(filter) === String(c.id))}>{c.name}</button>)}
-        </div>
+        {!clientMode && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+            <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>All clients</button>
+            {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} style={pill(String(filter) === String(c.id))}>{c.name}</button>)}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Show on cards</span>
           {[['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']].map(([k, label]) => (
@@ -258,6 +275,36 @@ export default function Dashboard() {
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
+      {selectModal && (
+        <div onClick={() => setSelectModal(false)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 420 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY, marginBottom: 6 }}>Select a client</h3>
+            <p style={{ fontSize: 12, color: MUTED, marginBottom: 16, lineHeight: 1.6 }}>Client Mode shows only this client — everyone else is hidden. Use it when screen-sharing.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
+              {clients.map((c) => (
+                <button key={c.id} onClick={() => enterClientMode(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
+                  <span style={{ fontSize: 13, color: TEXT, fontWeight: 500 }}>{c.name}</span>
+                </button>
+              ))}
+            </div>
+            <div style={modalActions}><button style={btnGhost} onClick={() => setSelectModal(false)}>Cancel</button></div>
+          </div>
+        </div>
+      )}
+      {endModal && (
+        <div onClick={() => setEndModal(false)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 380, textAlign: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(24,168,102,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}><span style={{ width: 12, height: 12, borderRadius: '50%', background: '#18a866', boxShadow: '0 0 8px #18a866' }} /></div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: NAVY, marginBottom: 8 }}>End Client Mode?</h3>
+            <p style={{ fontSize: 13, color: MUTED, marginBottom: 20, lineHeight: 1.6 }}>You're viewing only <strong>{clients.find((c) => c.id === clientMode)?.name}</strong>. Ending will show all clients again.</p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button style={btnGhost} onClick={() => setEndModal(false)}>Stay in Client Mode</button>
+              <button style={btnPrimary} onClick={exitClientMode}>End Client Mode</button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <Toast msg={toast} />}
     </div>
   )
@@ -478,8 +525,8 @@ const cardTab = (active) => ({ padding: '3px 9px', borderRadius: 6, border: '0.5
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }
 const modalBox = { background: '#fff', borderRadius: 14, padding: 24, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }
 const modalActions = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }
-const miniBtn = { height: 26, padding: '0 9px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 6, background: '#fff', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }
-const miniBtnP = { height: 26, padding: '0 9px', border: 'none', borderRadius: 6, background: NAVY, color: GOLD, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }
+const miniBtn = { height: 26, padding: '0 9px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 6, background: '#fff', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, whiteSpace: 'nowrap' }
+const miniBtnP = { height: 26, padding: '0 9px', border: 'none', borderRadius: 6, background: NAVY, color: GOLD, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, whiteSpace: 'nowrap' }
 const card = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '16px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column' }
 const sectionCard = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '18px 20px' }
 const addRow = { display: 'flex', alignItems: 'center', gap: 5, padding: '6px 9px', border: '0.5px dashed rgba(0,0,0,0.2)', borderRadius: 8, color: MUTED, fontSize: 12, cursor: 'pointer', background: 'none', width: '100%', fontFamily: 'inherit' }
