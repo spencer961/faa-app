@@ -79,6 +79,18 @@ const INFO_FIELDS = [
   ['numLocations', 'No. of locations'], ['locations', 'Practice location names'],
 ]
 
+// Client-profile sections that can be hidden while screen-sharing in Client Mode.
+const CM_SECTIONS = [
+  ['contact', 'Contact details'],
+  ['staff', 'Staff'],
+  ['notes', 'Notes'],
+  ['membership', 'Membership / tiers'],
+  ['billing', 'Billing'],
+  ['metrics', 'Metrics tracking'],
+  ['practices', 'Practices / locations'],
+  ['links', 'Links & files'],
+]
+
 export default function Dashboard() {
   const [clients, setClients] = useState([])
   const [links, setLinks] = useState([])
@@ -110,6 +122,11 @@ export default function Dashboard() {
   const [cardOverrides, setCardOverrides] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_card_overrides')) || {} } catch { return {} } })
   const [selectSettings, setSelectSettings] = useState(false)
   const [settingsScope, setSettingsScope] = useState('all')
+  // When Client Mode started — notes older than this are hidden while it's on.
+  const [cmSince, setCmSince] = useState(() => { try { return localStorage.getItem('faa_client_mode_since') || null } catch { return null } })
+  // Profile section ids hidden while in Client Mode (chosen in Client Mode settings).
+  const [cmHidden, setCmHidden] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_cm_hidden')) || [] } catch { return [] } })
+  const toggleCmSection = (id) => setCmHidden((h) => { const n = h.includes(id) ? h.filter((x) => x !== id) : [...h, id]; try { localStorage.setItem('faa_cm_hidden', JSON.stringify(n)) } catch { /* ignore */ } return n })
   const navigate = useNavigate()
   const toggleLayer = (k) => setToggles((t) => { const n = { ...t, [k]: !t[k] }; try { localStorage.setItem('faa_dash_toggles', JSON.stringify(n)) } catch { /* ignore */ } return n })
   // Set one layer, either globally ("all") or for a single client (per-client override).
@@ -144,8 +161,8 @@ export default function Dashboard() {
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
   const toggleCompact = () => setCompactFilter((v) => { const n = !v; try { localStorage.setItem('faa_dash_compact', n ? '1' : '0') } catch { /* ignore */ } return n })
   const switchView = (v) => { setView(v); setFilter('all'); try { localStorage.setItem('faa_dash_view', v) } catch { /* ignore */ } }
-  const enterClientMode = (id) => { setClientMode(id); try { localStorage.setItem('faa_client_mode', String(id)) } catch { /* ignore */ } setSelectModal(false); setDetailId(null); setEditMode(false) }
-  const exitClientMode = () => { setClientMode(null); try { localStorage.removeItem('faa_client_mode') } catch { /* ignore */ } setEndModal(false) }
+  const enterClientMode = (id) => { const since = new Date().toISOString(); setClientMode(id); setCmSince(since); try { localStorage.setItem('faa_client_mode', String(id)); localStorage.setItem('faa_client_mode_since', since) } catch { /* ignore */ } setSelectModal(false); setDetailId(null); setEditMode(false) }
+  const exitClientMode = () => { setClientMode(null); setCmSince(null); try { localStorage.removeItem('faa_client_mode'); localStorage.removeItem('faa_client_mode_since') } catch { /* ignore */ } setEndModal(false) }
 
   async function persistLinks(next) {
     setLinks(next)
@@ -276,7 +293,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onAddTier={addTier} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} cmSince={cmSince} hiddenSections={cmHidden} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -494,6 +511,20 @@ export default function Dashboard() {
                 </div>
               )
             })()}
+            {selectSettings && (
+              <div style={{ background: '#f7f6f4', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: MUTED, marginBottom: 8 }}>Show in Client Mode profile</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {CM_SECTIONS.map(([id, label]) => (
+                    <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT, cursor: 'pointer', padding: '4px 0' }}>
+                      <input type="checkbox" checked={!cmHidden.includes(id)} onChange={() => toggleCmSection(id)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <p style={{ fontSize: 11, color: MUTED, marginTop: 10, lineHeight: 1.5 }}>Unchecked sections are hidden from the client profile while Client Mode is on. Note history is always hidden in Client Mode.</p>
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
               {clients.map((c) => (
                 <button key={c.id} onClick={() => enterClientMode(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
@@ -597,11 +628,10 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onAddTier, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast, clientMode, cmSince, hiddenSections }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
-  const [newTier, setNewTier] = useState('')
   const [editOpen, setEditOpen] = useState(false)
   const [billingModal, setBillingModal] = useState(null)
   const [confirmPrac, setConfirmPrac] = useState(null)
@@ -614,6 +644,8 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const lastPay = payments[0]
   const shownLinks = links.filter((l) => !pracFilter || !l.practice || l.practice === pracFilter || l.practice === c.name)
   const addPractice = () => { const v = newPrac.trim(); if (!v || practices.includes(v)) return; onSavePractices(c.id, [...practices, v]); setNewPrac('') }
+  // Hide a section only when we're in Client Mode and it's flagged hidden in settings.
+  const showSec = (id) => !(clientMode && (hiddenSections || []).includes(id))
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Client Detail" back="/" right={<div style={{ display: 'flex', gap: 8 }}>
@@ -634,16 +666,21 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
           <button onClick={() => document.getElementById('files-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginLeft: 'auto', height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: 'rgba(11,29,94,0.05)', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>View Files ↓</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-          <InfoCard label="Doctor / primary contact" value={infoField(c, 'doctor') || c.doctor} />
-          <InfoCard label="Website" value={infoField(c, 'website')} href={infoField(c, 'website') ? websiteUrl(infoField(c, 'website')) : undefined} />
-          <InfoCard label="Time zone" value={infoField(c, 'timezone')} />
-          <InfoCard label="No. of locations" value={infoField(c, 'numLocations')} />
-          <div style={{ gridColumn: '1 / -1' }}><StaffCard staff={staffObjs} /></div>
-        </div>
-        <NotesSection client={c} onSave={onSaveNotes} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'stretch' }}>
-          <div style={sectionCard}>
+        {(showSec('contact') || showSec('staff')) && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            {showSec('contact') && <>
+              <InfoCard label="Doctor / primary contact" value={infoField(c, 'doctor') || c.doctor} />
+              <InfoCard label="Website" value={infoField(c, 'website')} href={infoField(c, 'website') ? websiteUrl(infoField(c, 'website')) : undefined} />
+              <InfoCard label="Time zone" value={infoField(c, 'timezone')} />
+              <InfoCard label="No. of locations" value={infoField(c, 'numLocations')} />
+            </>}
+            {showSec('staff') && <div style={{ gridColumn: '1 / -1' }}><StaffCard staff={staffObjs} /></div>}
+          </div>
+        )}
+        {showSec('notes') && <NotesSection client={c} onSave={onSaveNotes} clientMode={clientMode} cmSince={cmSince} />}
+        {(showSec('membership') || showSec('billing')) && (
+        <div style={{ display: 'grid', gridTemplateColumns: (showSec('membership') && showSec('billing')) ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16, alignItems: 'stretch' }}>
+          {showSec('membership') && <div style={sectionCard}>
             <SectionTitle>Membership / tiers</SectionTitle>
             <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Tag this client with every tier they belong to.</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -653,12 +690,8 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
                 </button>
               )})}
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <input style={{ ...inp, flex: 1 }} value={newTier} onChange={(e) => setNewTier(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (onAddTier(newTier), setNewTier(''))} placeholder="Add a tier (e.g. VIP)" />
-              <button style={btnPrimary} onClick={() => { onAddTier(newTier); setNewTier('') }}>Add tier</button>
-            </div>
-          </div>
-          <div style={sectionCard}>
+          </div>}
+          {showSec('billing') && <div style={sectionCard}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1.5px solid ' + GOLD, paddingBottom: 6, marginBottom: 10 }}>
               <span style={{ fontSize: 14, fontWeight: 500, color: TEXT }}>Billing</span>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -672,9 +705,10 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
               {billing.billingDay && <div><span style={{ color: MUTED }}>Bills on the {billing.billingDay} of each month</span></div>}
               {lastPay ? <div><span style={{ color: MUTED }}>Last payment: </span>{money(lastPay.amount)} — {lastPay.fmt || lastPay.date}</div> : <div style={{ color: MUTED, fontStyle: 'italic' }}>No payments yet.</div>}
             </div>
-          </div>
+          </div>}
         </div>
-        <div style={{ ...sectionCard, marginBottom: 16 }}>
+        )}
+        {showSec('metrics') && <div style={{ ...sectionCard, marginBottom: 16 }}>
           <SectionTitle>Metrics tracking</SectionTitle>
           <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>How often this client reports their numbers. Weekly clients enter one set of totals per week instead of per day.</div>
           <div style={{ display: 'inline-flex', gap: 4, background: '#eeece8', borderRadius: 999, padding: 3 }}>
@@ -682,8 +716,8 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
               <button key={v} onClick={() => onSetCadence(c.id, v)} style={{ padding: '6px 20px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
             )})}
           </div>
-        </div>
-        <div style={{ ...sectionCard, marginBottom: 16 }}>
+        </div>}
+        {showSec('practices') && <div style={{ ...sectionCard, marginBottom: 16 }}>
           <SectionTitle>Practices / locations</SectionTitle>
           <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Add each location, then tag a link to a location when you create it.</div>
           {infoField(c, 'locations') && (
@@ -702,8 +736,8 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <input style={{ ...inp, flex: 1 }} value={newPrac} onChange={(e) => setNewPrac(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addPractice()} placeholder="e.g. Odessa Family Dental" />
             <button onClick={addPractice} style={btnPrimary}>Add</button>
           </div>
-        </div>
-        <div id="files-section" style={sectionCard}>
+        </div>}
+        {showSec('links') && <div id="files-section" style={sectionCard}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <SectionTitle>Links & files ({shownLinks.length})</SectionTitle>
             <button onClick={() => setLinkEdit({ clientId: c.id })} style={{ ...addRow, width: 'auto', padding: '5px 12px' }}>+ Add link</button>
@@ -718,7 +752,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             {shownLinks.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No links yet.</div>}
             {shownLinks.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => onDeleteLink(l.id)} />)}
           </div>
-        </div>
+        </div>}
         {canUndo && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, padding: '12px 18px', background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 12 }}>
             <span style={{ fontSize: 13, color: MUTED }}>✓ Your last change was saved automatically.</span>
@@ -912,9 +946,12 @@ function AccountingModal({ modal, client, onClose, onSavePayment, onDeletePaymen
   )
 }
 
-function NotesSection({ client: c, onSave }) {
+function NotesSection({ client: c, onSave, clientMode, cmSince }) {
   const raw = () => (Array.isArray(c.info?.notesLog) ? c.info.notesLog : [])
-  const notes = [...raw()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const sorted = [...raw()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  // In Client Mode the client shouldn't see prior notes — only ones added this
+  // session are shown. Everything is still saved to the private profile view.
+  const notes = clientMode && cmSince ? sorted.filter((n) => n.createdAt >= cmSince) : sorted
   const [draft, setDraft] = useState('')
   const [editId, setEditId] = useState(null)
   const [editText, setEditText] = useState('')
@@ -927,12 +964,13 @@ function NotesSection({ client: c, onSave }) {
   return (
     <div style={{ ...sectionCard, marginBottom: 16 }}>
       <SectionTitle>Notes</SectionTitle>
+      {clientMode && <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Notes you add here are saved privately to your profile view — earlier notes are hidden during Client Mode.</div>}
       <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a note…" style={{ ...inp, flex: 1, height: 40, padding: '9px 10px', resize: 'vertical' }} />
         <button onClick={add} style={btnPrimary}>Add note</button>
       </div>
       <div style={{ maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {notes.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No notes yet.</div>}
+        {notes.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>{clientMode ? 'No notes added this session yet.' : 'No notes yet.'}</div>}
         {notes.map((n) => (
           <div key={n.id} style={{ background: BG, borderRadius: 8, padding: '10px 12px' }}>
             {editId === n.id ? (
@@ -948,9 +986,9 @@ function NotesSection({ client: c, onSave }) {
                 <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.text}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 11, color: MUTED }}>{fmt(n.createdAt)}{n.editedAt ? ' · edited ' + fmt(n.editedAt) : ''}</span>
-                  <button onClick={() => { setEditId(n.id); setEditText(n.text) }} style={noteLink}>Edit</button>
-                  {n.history && n.history.length > 0 && <button onClick={() => setHistId(histId === n.id ? null : n.id)} style={noteLink}>History ({n.history.length})</button>}
-                  {confirmDelId === n.id ? (
+                  {!clientMode && <button onClick={() => { setEditId(n.id); setEditText(n.text) }} style={noteLink}>Edit</button>}
+                  {!clientMode && n.history && n.history.length > 0 && <button onClick={() => setHistId(histId === n.id ? null : n.id)} style={noteLink}>History ({n.history.length})</button>}
+                  {!clientMode && (confirmDelId === n.id ? (
                     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: '#A32D2D' }}>Delete this note?</span>
                       <button onClick={() => setConfirmDelId(null)} style={noteLink}>No</button>
@@ -958,9 +996,9 @@ function NotesSection({ client: c, onSave }) {
                     </span>
                   ) : (
                     <button onClick={() => setConfirmDelId(n.id)} style={{ ...noteLink, color: '#A32D2D' }}>Delete</button>
-                  )}
+                  ))}
                 </div>
-                {histId === n.id && (
+                {!clientMode && histId === n.id && (
                   <div style={{ marginTop: 8, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {[...(n.history || [])].reverse().map((h, i) => (
                       <div key={i}><div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>{fmt(h.date)}</div><div style={{ fontSize: 12, color: MUTED, whiteSpace: 'pre-wrap' }}>{h.text}</div></div>
