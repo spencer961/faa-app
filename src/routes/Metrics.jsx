@@ -148,9 +148,18 @@ function ClientView({ clients, data, setData }) {
   const [form, setForm] = useState({})
   const [dirty, setDirty] = useState(false)
   const [toast, setToast] = useState('')
+  const client = clients.find((c) => c.id === cid)
+  // Some clients report weekly, not daily — set on the client profile.
+  const cadence = client?.info?.metricsCadence || client?.info?.info?.metricsCadence || 'daily'
 
   useEffect(() => { if (!cid && clients.length) setCid(clients[0].id) }, [clients, cid])
   useEffect(() => { setForm({ ...(data[cid]?.daily?.[date] || {}) }); setDirty(false) }, [cid, date, data])
+  // A weekly client enters once per week (keyed to the week-ending Friday); a daily
+  // client enters per day. Reset the view to the right mode when the client changes.
+  useEffect(() => {
+    if (cadence === 'weekly') { setPeriod('weekly'); setDate(getWeekEnding(today())) }
+    else { setPeriod('daily'); setDate(today()) }
+  }, [cid, cadence])
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
   const setField = (id, v) => { setForm((f) => ({ ...f, [id]: v })); setDirty(true) }
@@ -174,6 +183,7 @@ function ClientView({ clients, data, setData }) {
   }
 
   const isToday = date === today()
+  const isThisWeek = date === getWeekEnding(today())
   const filled = INPUT_METRICS.filter((m) => form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null).length
   const totalInputs = INPUT_METRICS.length
   // Enter or ↓ jumps to the next number field for fast keyboard entry.
@@ -185,6 +195,32 @@ function ClientView({ clients, data, setData }) {
     if (next) { e.preventDefault(); next.focus(); next.select() }
   }
 
+  // The clean single-column list — shared by the daily and weekly entry forms.
+  const entryListEl = (
+    <div className="sheet-list">
+      {METRICS.map((m) => m.calc ? (
+        <div className="sheet-row gold" key={m.id}>
+          <span className="sheet-name">{m.label}</span>
+          <span className="sheet-out">{fmtVal(m, calcVals[m.id])}</span>
+        </div>
+      ) : (
+        <div className="sheet-row" key={m.id}>
+          <span className="sheet-name">{m.label}{m.hint && <span className="sheet-hint">{m.hint}</span>}</span>
+          <span className="sheet-input-wrap">{m.dollar && <span className="ds">$</span>}<input className="metric-input sheet-input" type="number" min="0" inputMode="decimal" value={form[m.id] ?? ''} placeholder="0" onChange={(e) => setField(m.id, e.target.value)} onFocus={(e) => e.target.select()} onKeyDown={onKey} /></span>
+        </div>
+      ))}
+    </div>
+  )
+  const progressEl = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="progress-wrap" title={filled + ' of ' + totalInputs + ' fields entered'}>
+        <div className="progress-bar"><div className="progress-fill" style={{ width: (filled / totalInputs * 100) + '%' }} /></div>
+        <span className="progress-txt">{filled}/{totalInputs}</span>
+      </div>
+      <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save' : 'Saved ✓'}</button>
+    </div>
+  )
+
   return (
     <>
       <div className="cv-head">
@@ -194,7 +230,7 @@ function ClientView({ clients, data, setData }) {
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <div className="seg-ctrl">
-            {[['daily', 'Daily'], ['monthsheet', 'Month sheet'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([p, label]) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{label}</button>)}
+            {(cadence === 'weekly' ? [['weekly', 'Weekly'], ['monthly', 'Monthly']] : [['daily', 'Daily'], ['monthsheet', 'Month sheet'], ['weekly', 'Weekly'], ['monthly', 'Monthly']]).map(([p, label]) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{label}</button>)}
           </div>
         </div>
       </div>
@@ -208,31 +244,27 @@ function ClientView({ clients, data, setData }) {
               <button className="nav-btn" onClick={() => !isToday && setDate(shiftDate(date, 1))} disabled={isToday} style={{ opacity: isToday ? 0.3 : 1 }} title="Next day">›</button>
               {isToday && <span className="today-pill">Today</span>}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div className="progress-wrap" title={filled + ' of ' + totalInputs + ' fields entered'}>
-                <div className="progress-bar"><div className="progress-fill" style={{ width: (filled / totalInputs * 100) + '%' }} /></div>
-                <span className="progress-txt">{filled}/{totalInputs}</span>
-              </div>
-              <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save' : 'Saved ✓'}</button>
-            </div>
+            {progressEl}
           </div>
           <div className="sheet-tip">Tip: press <kbd>Tab</kbd> to jump to the next field.</div>
-          <div className="sheet-list">
-            {METRICS.map((m) => m.calc ? (
-              <div className="sheet-row gold" key={m.id}>
-                <span className="sheet-name">{m.label}</span>
-                <span className="sheet-out">{fmtVal(m, calcVals[m.id])}</span>
-              </div>
-            ) : (
-              <div className="sheet-row" key={m.id}>
-                <span className="sheet-name">{m.label}{m.hint && <span className="sheet-hint">{m.hint}</span>}</span>
-                <span className="sheet-input-wrap">{m.dollar && <span className="ds">$</span>}<input className="metric-input sheet-input" type="number" min="0" inputMode="decimal" value={form[m.id] ?? ''} placeholder="0" onChange={(e) => setField(m.id, e.target.value)} onFocus={(e) => e.target.select()} onKeyDown={onKey} /></span>
-              </div>
-            ))}
-          </div>
+          {entryListEl}
         </div>
       ) : period === 'monthsheet' ? (
         <MonthGrid cid={cid} clients={clients} data={data} setData={setData} />
+      ) : period === 'weekly' && cadence === 'weekly' ? (
+        <div className="entry-card narrow">
+          <div className="entry-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="nav-btn" onClick={() => setDate(shiftDate(date, -7))} title="Previous week">‹</button>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>Week of {fmtWeekLabel(date)}</span>
+              <button className="nav-btn" onClick={() => !isThisWeek && setDate(shiftDate(date, 7))} disabled={isThisWeek} style={{ opacity: isThisWeek ? 0.3 : 1 }} title="Next week">›</button>
+              {isThisWeek && <span className="today-pill">This week</span>}
+            </div>
+            {progressEl}
+          </div>
+          <div className="sheet-tip">Enter this client’s weekly totals. Press <kbd>Tab</kbd> to jump to the next field.</div>
+          {entryListEl}
+        </div>
       ) : (
         <AggView daily={data[cid]?.daily || {}} period={period} />
       )}
