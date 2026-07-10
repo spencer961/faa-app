@@ -45,7 +45,8 @@
       "Bash(git commit -q -m 'Success Map: add expand/collapse-all toggle, drop the encouraging line *)",
       "Bash(git commit -q -m 'Success Map scoring: widen scoring panel 20%, add 20% page side margins *)",
       "Bash(git commit -q -m 'Success Map scoring: make 20% side margins desktop-only *)",
-      "Bash(git commit -q -m 'Success Map scoring: narrow left section ~20%, widen scoring panel to fill *)"
+      "Bash(git commit -q -m 'Success Map scoring: narrow left section ~20%, widen scoring panel to fill *)",
+      "Bash(git commit -q -m 'Success Map scoring: dial left-column shrink from 20% to 10% *)"
     ]
   }
 }

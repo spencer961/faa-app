@@ -262,7 +262,7 @@ function Assessment({ client, ass, setAss, cycleScore, onCancel, onPublish }) {
         <button onClick={onPublish} disabled={!ass.label.trim()} style={{ ...BTNP, background: GOLD, color: NAVY, opacity: ass.label.trim() ? 1 : 0.5 }}>Publish Assessment →</button>
       </div>} />
       <style>{`.sm-assess-grid{padding:0 20%;}@media(max-width:1024px){.sm-assess-grid{padding:0;}}`}</style>
-      <div className="sm-assess-grid" style={{ display: 'grid', gridTemplateColumns: '0.85fr 1fr', flex: 1, overflow: 'hidden' }}>
+      <div className="sm-assess-grid" style={{ display: 'grid', gridTemplateColumns: '1.07fr 1fr', flex: 1, overflow: 'hidden' }}>
         <div style={{ overflowY: 'auto', padding: 20 }}>
           <div style={{ ...CARD, marginBottom: 16, borderLeft: '3px solid ' + GOLD }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Assessment Details — {client.name}</div>
