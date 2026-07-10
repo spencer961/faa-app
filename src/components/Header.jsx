@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { NAVY, GOLD, TEXT, MUTED } from '../lib/theme.js'
+import { isSuperAdmin } from '../lib/auth.js'
 
 // The navy/gold top bar — written once, used on every page.
 export default function Header({ sub, back, right, hideMenu }) {
@@ -33,6 +34,7 @@ const NAV = [
   { to: '/tasks', label: 'To-Do Lists' },
   { to: '/onboarding', label: 'Onboarding Form' },
   { to: '/portal', label: 'Client Portal' },
+  ...(isSuperAdmin() ? [{ to: '/admin', label: 'Super Admin' }] : []),
 ]
 
 function NavMenu() {

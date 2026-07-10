@@ -15,3 +15,8 @@ export const isAdmin = () => {
   // TODO (auth step): replace with the logged-in user's role === 'admin'.
   return true
 }
+
+// Super admin — the owner (you). Can manage tiers, pricing, guides, team,
+// approvals, integrations, and backups. Regular admins won't see these.
+// TODO (auth step): return the logged-in user's role === 'super_admin'.
+export const isSuperAdmin = () => true

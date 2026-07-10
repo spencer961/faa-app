@@ -6,6 +6,7 @@ import SuccessMap from './routes/SuccessMap.jsx'
 import Metrics from './routes/Metrics.jsx'
 import Tasks from './routes/Tasks.jsx'
 import ClientPortal from './routes/ClientPortal.jsx'
+import SuperAdmin from './routes/SuperAdmin.jsx'
 
 // Every "page" is now a route in one app. Each still lives in its own
 // file — editing one doesn't touch the others.
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/metrics" element={<Metrics />} />
       <Route path="/tasks" element={<Tasks />} />
       <Route path="/portal" element={<ClientPortal />} />
+      <Route path="/admin" element={<SuperAdmin />} />
     </Routes>
   )
 }

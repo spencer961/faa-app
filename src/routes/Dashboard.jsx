@@ -178,7 +178,14 @@ export default function Dashboard() {
     else { const id = links.reduce((m, l) => Math.max(m, l.id || 0), 0) + 1; next = [...links, { id, clientId: form.clientId, label: form.label.trim(), category: form.category.trim() || 'General', url: form.url.trim(), practice }] }
     await persistLinks(next); setLinkModal(null); showToast(form.id ? 'Link updated ✓' : 'Link added ✓')
   }
-  async function deleteLink(id) { await persistLinks(links.filter((l) => l.id !== id)); setLinkModal(null); showToast('Link deleted') }
+  async function deleteLink(id) {
+    const prevLinks = links
+    const deleted = links.find((l) => l.id === id)
+    await persistLinks(links.filter((l) => l.id !== id))
+    setUndo({ clientId: deleted?.clientId, restore: async () => { await persistLinks(prevLinks) } })
+    setLinkModal(null)
+    showToast('Link deleted')
+  }
 
   // First write to the clients table: update just the practices list,
   // preserving everything else already in the client's info record.
@@ -306,7 +313,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
-      <Header sub="Command Center" back="/" right={
+      <Header sub="Command Center" back={clientMode ? undefined : '/'} hideMenu={clientMode} right={
         clientMode ? (
           <button onClick={() => setEndModal(true)} title="You're in Client Mode — click to end" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(24,168,102,0.18)', border: '0.5px solid rgba(24,168,102,0.55)', color: '#fff', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
@@ -644,6 +651,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const [editOpen, setEditOpen] = useState(false)
   const [billingModal, setBillingModal] = useState(null)
   const [confirmPrac, setConfirmPrac] = useState(null)
+  const [confirmLink, setConfirmLink] = useState(null)
   const info = c.info || {}
   const cadence = info.metricsCadence || info.info?.metricsCadence || 'daily'
   const practices = getPractices(c)
@@ -774,7 +782,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {shownLinks.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No links yet.</div>}
-            {shownLinks.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => onDeleteLink(l.id)} />)}
+            {shownLinks.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode onEdit={() => setLinkEdit({ id: l.id, clientId: c.id })} onDelete={() => setConfirmLink(l)} />)}
           </div>
         </div>}
         {canUndo && (
@@ -795,6 +803,18 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <div style={modalActions}>
               <button style={btnGhost} onClick={() => setConfirmPrac(null)}>Cancel</button>
               <button style={{ ...btnPrimary, background: '#A32D2D' }} onClick={() => { onSavePractices(c.id, practices.filter((x) => x !== confirmPrac)); setConfirmPrac(null) }}>Delete location</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmLink && (
+        <div onClick={() => setConfirmLink(null)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 380 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: NAVY, marginBottom: 8 }}>Delete this link?</h3>
+            <p style={{ fontSize: 13, color: MUTED, marginBottom: 20, lineHeight: 1.6 }}><strong style={{ color: TEXT }}>{confirmLink.label}</strong>{confirmLink.category ? ' (' + confirmLink.category + ')' : ''} will be removed from this client. You can undo this right after.</p>
+            <div style={modalActions}>
+              <button style={btnGhost} onClick={() => setConfirmLink(null)}>Cancel</button>
+              <button style={{ ...btnPrimary, background: '#A32D2D' }} onClick={() => { onDeleteLink(confirmLink.id); setConfirmLink(null) }}>Delete link</button>
             </div>
           </div>
         </div>
