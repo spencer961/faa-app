@@ -513,7 +513,7 @@ const CSS = `
 .mx .sheet-tip{padding:8px 16px;font-size:11px;color:#888786;background:#f9f9f8;border-bottom:0.5px solid rgba(0,0,0,0.06);}
 .mx .sheet-tip kbd{font-family:inherit;font-size:10px;background:#fff;border:0.5px solid rgba(0,0,0,0.2);border-radius:4px;padding:1px 5px;color:#1a1a1a;}
 .mx .sheet-list{padding:0 0 6px;}
-.mx .sheet-sec{padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#7c7b78;background:#eeece8;border-bottom:0.5px solid rgba(0,0,0,0.05);}
+.mx .sheet-sec{padding:13px 16px 5px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#bc9762;}
 .mx .sheet-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 16px;background:#fff;}
 .mx .sheet-row.alt{background:#f6f5f3;}
 .mx .sheet-row.gold{background:#FAEEDA;}
