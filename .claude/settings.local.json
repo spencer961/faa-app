@@ -38,7 +38,8 @@
       "Bash(git commit -q -m 'Profile: Metrics tracking becomes a compact card in the info grid *)",
       "Bash(git commit -q -m 'Client Mode: settings in own modal, cleaner profile header, drop notes hint *)",
       "Bash(git commit -q -m 'Profile: 3-column second row \\(metrics beside no. of locations\\); trim Client Mode button *)",
-      "Bash(git commit -q -m 'Client Mode menu hidden; link delete confirm+undo; Super Admin settings page *)"
+      "Bash(git commit -q -m 'Client Mode menu hidden; link delete confirm+undo; Super Admin settings page *)",
+      "Bash(git commit -q -m 'Client Mode: profile button now prompts to end instead of exiting silently *)"
     ]
   }
 }

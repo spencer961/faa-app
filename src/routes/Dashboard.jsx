@@ -652,6 +652,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const [billingModal, setBillingModal] = useState(null)
   const [confirmPrac, setConfirmPrac] = useState(null)
   const [confirmLink, setConfirmLink] = useState(null)
+  const [endCM, setEndCM] = useState(false)
   const info = c.info || {}
   const cadence = info.metricsCadence || info.info?.metricsCadence || 'daily'
   const practices = getPractices(c)
@@ -668,7 +669,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
       <Header sub="Client Detail" back={clientMode ? undefined : '/'} hideMenu={clientMode} right={clientMode ? (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← Back</button>
-          <button onClick={onExitClientMode} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(24,232,138,0.14)', border: '0.5px solid rgba(24,232,138,0.4)', color: '#18e88a', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+          <button onClick={() => setEndCM(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(24,232,138,0.14)', border: '0.5px solid rgba(24,232,138,0.4)', color: '#18e88a', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
             {clientModeName}
           </button>
@@ -815,6 +816,19 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <div style={modalActions}>
               <button style={btnGhost} onClick={() => setConfirmLink(null)}>Cancel</button>
               <button style={{ ...btnPrimary, background: '#A32D2D' }} onClick={() => { onDeleteLink(confirmLink.id); setConfirmLink(null) }}>Delete link</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {endCM && (
+        <div onClick={() => setEndCM(false)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 380, textAlign: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(24,168,102,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}><span style={{ width: 12, height: 12, borderRadius: '50%', background: '#18a866', boxShadow: '0 0 8px #18a866' }} /></div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: NAVY, marginBottom: 8 }}>End Client Mode?</h3>
+            <p style={{ fontSize: 13, color: MUTED, marginBottom: 20, lineHeight: 1.6 }}>You're viewing only <strong>{clientModeName}</strong>. Ending will show all clients again.</p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button style={btnGhost} onClick={() => setEndCM(false)}>Stay in Client Mode</button>
+              <button style={btnPrimary} onClick={() => { setEndCM(false); onExitClientMode() }}>End Client Mode</button>
             </div>
           </div>
         </div>
