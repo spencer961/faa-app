@@ -43,7 +43,8 @@
       "Bash(git commit -q -m 'Super Admin: merge settings against fresh app_state to avoid clobbering links *)",
       "Bash(git commit -q -m 'Success Map: redesign the client report to be calmer and easier to read *)",
       "Bash(git commit -q -m 'Success Map: add expand/collapse-all toggle, drop the encouraging line *)",
-      "Bash(git commit -q -m 'Success Map scoring: widen scoring panel 20%, add 20% page side margins *)"
+      "Bash(git commit -q -m 'Success Map scoring: widen scoring panel 20%, add 20% page side margins *)",
+      "Bash(git commit -q -m 'Success Map scoring: make 20% side margins desktop-only *)"
     ]
   }
 }
