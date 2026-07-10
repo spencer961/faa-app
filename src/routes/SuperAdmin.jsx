@@ -38,9 +38,13 @@ export default function SuperAdmin() {
   const branding = data?.branding || {}
 
   async function patch(next) {
-    const merged = { ...(data || {}), ...next }
-    setData(merged)
-    await supabase.from('app_state').upsert({ id: STATE_ID, data: merged, updated_at: new Date().toISOString() })
+    setData((d) => ({ ...(d || {}), ...next }))
+    // Re-read the latest blob first, then apply only the keys we changed — so we
+    // never clobber links or other data edited elsewhere with a stale copy.
+    const { data: st } = await supabase.from('app_state').select('data').eq('id', STATE_ID).single()
+    const toSave = { ...(st?.data || {}), ...next }
+    await supabase.from('app_state').upsert({ id: STATE_ID, data: toSave, updated_at: new Date().toISOString() })
+    setData(toSave)
     showToast('Saved ✓')
   }
 
