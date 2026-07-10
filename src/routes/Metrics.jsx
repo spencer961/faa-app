@@ -230,7 +230,7 @@ function ClientView({ clients, data, setData }) {
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <div className="seg-ctrl">
-            {(cadence === 'weekly' ? [['weekly', 'Weekly'], ['monthly', 'Monthly']] : [['daily', 'Daily'], ['monthsheet', 'Month sheet'], ['weekly', 'Weekly'], ['monthly', 'Monthly']]).map(([p, label]) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{label}</button>)}
+            {(cadence === 'weekly' ? [['weekly', 'Weekly'], ['weeksheet', 'Weeks sheet'], ['monthly', 'Monthly']] : [['daily', 'Daily'], ['monthsheet', 'Month sheet'], ['weekly', 'Weekly'], ['monthly', 'Monthly']]).map(([p, label]) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{label}</button>)}
           </div>
         </div>
       </div>
@@ -250,7 +250,9 @@ function ClientView({ clients, data, setData }) {
           {entryListEl}
         </div>
       ) : period === 'monthsheet' ? (
-        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} />
+        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} mode="daily" />
+      ) : period === 'weeksheet' ? (
+        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} mode="weekly" />
       ) : period === 'weekly' && cadence === 'weekly' ? (
         <div className="entry-card narrow">
           <div className="entry-bar">
@@ -273,32 +275,37 @@ function ClientView({ clients, data, setData }) {
   )
 }
 
-// ── MONTH SHEET ────────────────────────────────────────────────────────
-// Full month as a spreadsheet: metrics down the left, weekdays across the top.
+// ── BULK SHEET ─────────────────────────────────────────────────────────
+// Full period as a spreadsheet: metrics down the left, dates across the top.
+// Daily clients get a month of weekdays; weekly clients get a run of weeks.
 // Built for bulk entry — paste a block straight from the client's Google Sheet
 // and it drops into the matching cells (computed gold rows are left untouched).
+const WEEKS_SHOWN = 13
 const monthShift = (mk, delta) => { const [y, mo] = mk.split('-').map(Number); const dt = new Date(y, mo - 1 + delta, 1); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') }
 const weekdaysOf = (mk) => { const [y, mo] = mk.split('-').map(Number); const last = new Date(y, mo, 0).getDate(); const out = []; for (let d = 1; d <= last; d++) { const dt = new Date(y, mo - 1, d); const wd = dt.getDay(); if (wd >= 1 && wd <= 5) out.push(mk + '-' + String(d).padStart(2, '0')) } return out }
+const weeksEndingAt = (fri) => Array.from({ length: WEEKS_SHOWN }, (_, i) => shiftDate(fri, -7 * (WEEKS_SHOWN - 1 - i)))
 const dayHdr = (dk) => new Date(dk + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const colsFor = (mode, anchor) => mode === 'weekly' ? weeksEndingAt(anchor) : weekdaysOf(anchor)
 
-function MonthGrid({ cid, clients, data, setData }) {
-  const [monthKey, setMonthKey] = useState(today().slice(0, 7))
+function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
+  const [anchor, setAnchor] = useState(mode === 'weekly' ? getWeekEnding(today()) : today().slice(0, 7))
   const [grid, setGrid] = useState({})
   const [dirty, setDirty] = useState(false)
   const [toast, setToast] = useState('')
-  const days = weekdaysOf(monthKey)
+  const weekly = mode === 'weekly'
+  const cols = colsFor(mode, anchor)
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
 
   useEffect(() => {
     const daily = data[cid]?.daily || {}
     const g = {}
-    weekdaysOf(monthKey).forEach((dk) => { g[dk] = { ...(daily[dk] || {}) } })
+    colsFor(mode, anchor).forEach((dk) => { g[dk] = { ...(daily[dk] || {}) } })
     setGrid(g); setDirty(false)
-  }, [cid, monthKey, data])
+  }, [cid, anchor, data, mode])
 
   const setCell = (dk, mid, v) => { setGrid((g) => ({ ...g, [dk]: { ...(g[dk] || {}), [mid]: v } })); setDirty(true) }
 
-  // Paste a spreadsheet block: rows = metrics, columns = days, anchored at the target cell.
+  // Paste a spreadsheet block: rows = metrics, columns = dates, anchored at the target cell.
   const onPaste = (e, mIndex, dIndex) => {
     const text = e.clipboardData.getData('text')
     if (!text) return
@@ -310,7 +317,7 @@ function MonthGrid({ cid, clients, data, setData }) {
         const metric = METRICS[mIndex + i]
         if (!metric || metric.calc) return // never write into computed gold rows
         rowVals.forEach((raw, j) => {
-          const dk = days[dIndex + j]
+          const dk = cols[dIndex + j]
           if (!dk) return
           const clean = String(raw).trim().replace(/[$,%\s]/g, '')
           ng[dk] = { ...(ng[dk] || {}), [metric.id]: clean }
@@ -332,17 +339,17 @@ function MonthGrid({ cid, clients, data, setData }) {
     if (!rows.length) { showToast('Nothing to save'); return }
     await fetch(`${SUPABASE_URL}/rest/v1/metrics_tracker`, { method: 'POST', headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) })
     setData((md) => { const daily = { ...(md[cid]?.daily || {}) }; rows.forEach((r) => { daily[r.date_key] = r.data }); return { ...md, [cid]: { ...(md[cid] || {}), daily } } })
-    setDirty(false); showToast('Saved ' + rows.length + ' day' + (rows.length !== 1 ? 's' : '') + ' ✓')
+    setDirty(false); const unit = weekly ? 'week' : 'day'; showToast('Saved ' + rows.length + ' ' + unit + (rows.length !== 1 ? 's' : '') + ' ✓')
   }
 
   const bodyRows = []
   let lastSec = null
   METRICS.forEach((m, mi) => {
-    if (m.section !== lastSec) { lastSec = m.section; bodyRows.push(<tr key={'sec_' + m.section} className="gt-sec"><td colSpan={days.length + 1}>{SEC_LABEL[m.section] || m.section}</td></tr>) }
+    if (m.section !== lastSec) { lastSec = m.section; bodyRows.push(<tr key={'sec_' + m.section} className="gt-sec"><td colSpan={cols.length + 1}>{SEC_LABEL[m.section] || m.section}</td></tr>) }
     bodyRows.push(
       <tr key={m.id} className={m.calc ? 'gt-gold' : ''}>
         <td className="gt-name" title={m.hint || ''}>{m.label}</td>
-        {days.map((dk, di) => m.calc
+        {cols.map((dk, di) => m.calc
           ? <td key={dk} className="gt-cell gt-out">{fmtVal(m, m.calc(grid[dk] || {}))}</td>
           : <td key={dk} className="gt-cell"><input className="gt-input" type="number" value={grid[dk]?.[m.id] ?? ''} onChange={(e) => setCell(dk, m.id, e.target.value)} onPaste={(e) => onPaste(e, mi, di)} onFocus={(e) => e.target.select()} /></td>
         )}
@@ -350,20 +357,26 @@ function MonthGrid({ cid, clients, data, setData }) {
     )
   })
 
+  const rangeLabel = weekly
+    ? dayHdr(cols[0]) + ' – ' + new Date(cols[cols.length - 1] + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : new Date(anchor + '-01T12:00:00').toLocaleString('default', { month: 'long', year: 'numeric' })
+  const prev = () => setAnchor(weekly ? shiftDate(anchor, -7 * WEEKS_SHOWN) : monthShift(anchor, -1))
+  const next = () => setAnchor(weekly ? shiftDate(anchor, 7 * WEEKS_SHOWN) : monthShift(anchor, 1))
+
   return (
     <div className="entry-card">
       <div className="entry-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="nav-btn" onClick={() => setMonthKey(monthShift(monthKey, -1))} title="Previous month">‹</button>
-          <span style={{ fontSize: 13, fontWeight: 500, minWidth: 130, textAlign: 'center' }}>{new Date(monthKey + '-01T12:00:00').toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-          <button className="nav-btn" onClick={() => setMonthKey(monthShift(monthKey, 1))} title="Next month">›</button>
+          <button className="nav-btn" onClick={prev} title={weekly ? 'Earlier weeks' : 'Previous month'}>‹</button>
+          <span style={{ fontSize: 13, fontWeight: 500, minWidth: weekly ? 160 : 130, textAlign: 'center' }}>{rangeLabel}</span>
+          <button className="nav-btn" onClick={next} title={weekly ? 'Later weeks' : 'Next month'}>›</button>
         </div>
         <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save all' : 'Saved ✓'}</button>
       </div>
-      <div className="gt-note"><span>Paste rows straight from your spreadsheet — click the first day’s cell for a metric, then paste. Gold rows total up automatically.</span></div>
+      <div className="gt-note"><span>Paste columns straight from your spreadsheet — click the first {weekly ? 'week' : 'day'}’s cell for a metric, then paste. Gold rows total up automatically.</span></div>
       <div className="gt-scroll">
         <table className="grid-table">
-          <thead><tr><th className="gt-name-h">Daily metric</th>{days.map((dk) => <th key={dk} className="gt-day-h">{dayHdr(dk)}</th>)}</tr></thead>
+          <thead><tr><th className="gt-name-h">{weekly ? 'Weekly metric' : 'Daily metric'}</th>{cols.map((dk) => <th key={dk} className="gt-day-h">{dayHdr(dk)}</th>)}</tr></thead>
           <tbody>{bodyRows}</tbody>
         </table>
       </div>
