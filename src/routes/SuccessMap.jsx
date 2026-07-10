@@ -261,7 +261,7 @@ function Assessment({ client, ass, setAss, cycleScore, onCancel, onPublish }) {
         <HdrBtn onClick={onCancel}>← Cancel</HdrBtn>
         <button onClick={onPublish} disabled={!ass.label.trim()} style={{ ...BTNP, background: GOLD, color: NAVY, opacity: ass.label.trim() ? 1 : 0.5 }}>Publish Assessment →</button>
       </div>} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 408px', flex: 1, overflow: 'hidden', padding: '0 20%' }}>
         <div style={{ overflowY: 'auto', padding: 20 }}>
           <div style={{ ...CARD, marginBottom: 16, borderLeft: '3px solid ' + GOLD }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Assessment Details — {client.name}</div>
@@ -359,7 +359,7 @@ function ScoringPanel({ scores, onCycle }) {
   const ALL = leafIds(CATS)
   const hp = Math.round((ALL.filter((id) => (scores[id] || 'red') === 'green').length / ALL.length) * 100)
   return (
-    <div style={{ background: '#fff', borderLeft: '1px solid ' + BORDER, overflowY: 'auto', padding: '18px 16px', width: 340, flexShrink: 0 }}>
+    <div style={{ background: '#fff', borderLeft: '1px solid ' + BORDER, overflowY: 'auto', padding: '18px 16px', width: 408, flexShrink: 0 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Success Map Scoring</div>
       <div style={{ fontSize: 11, color: MUTED, marginBottom: 14 }}>{onCycle ? 'Click any dot to cycle: Red → Yellow → Green' : 'Latest scores'}</div>
       <div style={{ padding: '12px 16px', background: BG, borderRadius: 10, border: '0.5px solid ' + BORDER, marginBottom: 16, display: 'flex', alignItems: 'baseline', gap: 6 }}>
