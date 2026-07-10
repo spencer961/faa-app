@@ -293,7 +293,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} cmSince={cmSince} hiddenSections={cmHidden} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} clientModeName={clients.find((c) => c.id === clientMode)?.name || ''} onExitClientMode={() => { exitClientMode(); setDetailId(null) }} cmSince={cmSince} hiddenSections={cmHidden} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -478,12 +478,32 @@ export default function Dashboard() {
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 420 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
               <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY }}>Select a client</h3>
-              <button onClick={() => setSelectSettings((s) => !s)} title="Card display settings" aria-label="Card display settings" style={{ width: 30, height: 30, borderRadius: 7, border: '0.5px solid rgba(0,0,0,0.12)', background: selectSettings ? '#f2f4f8' : '#fff', color: NAVY, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <button onClick={() => setSelectSettings(true)} title="Client Mode settings" aria-label="Client Mode settings" style={{ width: 30, height: 30, borderRadius: 7, border: '0.5px solid rgba(0,0,0,0.12)', background: '#fff', color: NAVY, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
               </button>
             </div>
             <p style={{ fontSize: 12, color: MUTED, marginBottom: 16, lineHeight: 1.6 }}>Client Mode shows only this client — everyone else is hidden. Use it when screen-sharing.</p>
-            {selectSettings && (() => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
+              {clients.map((c) => (
+                <button key={c.id} onClick={() => enterClientMode(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
+                  <span style={{ fontSize: 13, color: TEXT, fontWeight: 500 }}>{c.name}</span>
+                </button>
+              ))}
+            </div>
+            <div style={modalActions}><button style={btnGhost} onClick={() => setSelectModal(false)}>Cancel</button></div>
+          </div>
+        </div>
+      )}
+      {selectSettings && (
+        <div onClick={() => setSelectSettings(false)} style={{ ...overlay, zIndex: 1100 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 440, maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY }}>Client Mode settings</h3>
+              <button onClick={() => setSelectSettings(false)} title="Close" aria-label="Close" style={{ width: 30, height: 30, borderRadius: 7, border: 'none', background: 'none', color: MUTED, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 18, lineHeight: 1 }}>×</button>
+            </div>
+            <p style={{ fontSize: 12, color: MUTED, marginBottom: 16, lineHeight: 1.6 }}>Changes save as you make them. Close when you’re done.</p>
+            {(() => {
               const eff = settingsScope === 'all' ? toggles : (cardOverrides[settingsScope] || toggles)
               const layers = [['todos', 'To-dos'], ['progress', 'Progress'], ['metrics', 'Metrics'], ['accounting', 'Accounting']]
               return (
@@ -511,29 +531,18 @@ export default function Dashboard() {
                 </div>
               )
             })()}
-            {selectSettings && (
-              <div style={{ background: '#f7f6f4', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: MUTED, marginBottom: 8 }}>Show in Client Mode profile</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {CM_SECTIONS.map(([id, label]) => (
-                    <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT, cursor: 'pointer', padding: '4px 0' }}>
-                      <input type="checkbox" checked={!cmHidden.includes(id)} onChange={() => toggleCmSection(id)} />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-                <p style={{ fontSize: 11, color: MUTED, marginTop: 10, lineHeight: 1.5 }}>Unchecked sections are hidden from the client profile while Client Mode is on. Note history is always hidden in Client Mode.</p>
+            <div style={{ background: '#f7f6f4', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: MUTED, marginBottom: 8 }}>Show in Client Mode profile</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {CM_SECTIONS.map(([id, label]) => (
+                  <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT, cursor: 'pointer', padding: '4px 0' }}>
+                    <input type="checkbox" checked={!cmHidden.includes(id)} onChange={() => toggleCmSection(id)} />
+                    {label}
+                  </label>
+                ))}
               </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
-              {clients.map((c) => (
-                <button key={c.id} onClick={() => enterClientMode(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
-                  <span style={{ fontSize: 13, color: TEXT, fontWeight: 500 }}>{c.name}</span>
-                </button>
-              ))}
+              <p style={{ fontSize: 11, color: MUTED, marginTop: 10, lineHeight: 1.5 }}>Unchecked sections are hidden from the client profile while Client Mode is on. Note history is always hidden in Client Mode.</p>
             </div>
-            <div style={modalActions}><button style={btnGhost} onClick={() => setSelectModal(false)}>Cancel</button></div>
           </div>
         </div>
       )}
@@ -628,7 +637,7 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast, clientMode, cmSince, hiddenSections }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast, clientMode, clientModeName, onExitClientMode, cmSince, hiddenSections }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
@@ -648,10 +657,20 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const showSec = (id) => !(clientMode && (hiddenSections || []).includes(id))
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
-      <Header sub="Client Detail" back="/" right={<div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => setEditOpen(true)} style={{ background: GOLD, border: 'none', color: NAVY, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Edit profile</button>
-        <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← All clients</button>
-      </div>} />
+      <Header sub="Client Detail" back={clientMode ? undefined : '/'} hideMenu={clientMode} right={clientMode ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← Back</button>
+          <button onClick={onExitClientMode} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(24,232,138,0.14)', border: '0.5px solid rgba(24,232,138,0.4)', color: '#18e88a', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
+            Client Mode: {clientModeName}
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setEditOpen(true)} style={{ background: GOLD, border: 'none', color: NAVY, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Edit profile</button>
+          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← All clients</button>
+        </div>
+      )} />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
           <div style={{ width: 48, height: 48, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>{ini(c.name)}</div>
@@ -965,7 +984,6 @@ function NotesSection({ client: c, onSave, clientMode, cmSince }) {
   return (
     <div style={{ ...sectionCard, marginBottom: 16 }}>
       <SectionTitle>Notes</SectionTitle>
-      {clientMode && <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Notes you add here are saved privately to your profile view — earlier notes are hidden during Client Mode.</div>}
       <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a note…" style={{ ...inp, flex: 1, height: 40, padding: '9px 10px', resize: 'vertical' }} />
         <button onClick={add} style={btnPrimary}>Add note</button>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { NAVY, GOLD, TEXT, MUTED } from '../lib/theme.js'
 
 // The navy/gold top bar — written once, used on every page.
-export default function Header({ sub, back, right }) {
+export default function Header({ sub, back, right, hideMenu }) {
   return (
     <div style={{ background: NAVY, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
@@ -19,7 +19,7 @@ export default function Header({ sub, back, right }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {right}
-        <NavMenu />
+        {!hideMenu && <NavMenu />}
       </div>
     </div>
   )

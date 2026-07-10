@@ -35,7 +35,8 @@
       "Bash(git commit -q -m 'Metrics: add Weeks sheet bulk-paste for weekly clients *)",
       "Bash(git commit -q -m 'Profile: separate Metrics tracking section, match card heights, fix practice delete+undo *)",
       "Bash(git commit -q -m 'Client Mode: hideable profile sections + private session notes; remove add-tier from profile *)",
-      "Bash(git commit -q -m 'Profile: Metrics tracking becomes a compact card in the info grid *)"
+      "Bash(git commit -q -m 'Profile: Metrics tracking becomes a compact card in the info grid *)",
+      "Bash(git commit -q -m 'Client Mode: settings in own modal, cleaner profile header, drop notes hint *)"
     ]
   }
 }
