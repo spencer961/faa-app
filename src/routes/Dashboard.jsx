@@ -666,7 +666,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
           <button onClick={() => document.getElementById('files-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginLeft: 'auto', height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: 'rgba(11,29,94,0.05)', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>View Files ↓</button>
         </div>
-        {(showSec('contact') || showSec('staff')) && (
+        {(showSec('contact') || showSec('staff') || showSec('metrics')) && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             {showSec('contact') && <>
               <InfoCard label="Doctor / primary contact" value={infoField(c, 'doctor') || c.doctor} />
@@ -674,6 +674,16 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
               <InfoCard label="Time zone" value={infoField(c, 'timezone')} />
               <InfoCard label="No. of locations" value={infoField(c, 'numLocations')} />
             </>}
+            {showSec('metrics') && (
+              <div style={{ background: '#fff', borderRadius: 8, padding: '12px 14px', border: '0.5px solid rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Metrics tracking</div>
+                <div style={{ display: 'inline-flex', gap: 4, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+                  {[['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, label]) => { const on = cadence === v; return (
+                    <button key={v} onClick={() => onSetCadence(c.id, v)} style={{ padding: '4px 14px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
+                  )})}
+                </div>
+              </div>
+            )}
             {showSec('staff') && <div style={{ gridColumn: '1 / -1' }}><StaffCard staff={staffObjs} /></div>}
           </div>
         )}
@@ -708,15 +718,6 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           </div>}
         </div>
         )}
-        {showSec('metrics') && <div style={{ ...sectionCard, marginBottom: 16 }}>
-          <SectionTitle>Metrics tracking</SectionTitle>
-          <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>How often this client reports their numbers. Weekly clients enter one set of totals per week instead of per day.</div>
-          <div style={{ display: 'inline-flex', gap: 4, background: '#eeece8', borderRadius: 999, padding: 3 }}>
-            {[['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, label]) => { const on = cadence === v; return (
-              <button key={v} onClick={() => onSetCadence(c.id, v)} style={{ padding: '6px 20px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
-            )})}
-          </div>
-        </div>}
         {showSec('practices') && <div style={{ ...sectionCard, marginBottom: 16 }}>
           <SectionTitle>Practices / locations</SectionTitle>
           <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Add each location, then tag a link to a location when you create it.</div>
