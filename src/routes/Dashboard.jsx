@@ -168,13 +168,22 @@ export default function Dashboard() {
   async function savePractices(clientId, list) {
     const c = clients.find((x) => x.id === clientId)
     if (!c) return
+    const prevInfo = c.info
+    const prevLinks = links
     const info = { ...(c.info || {}), practices: list }
     setClients((cs) => cs.map((x) => (x.id === clientId ? { ...x, info } : x)))
     // drop tags that point at a now-removed practice
     const valid = new Set(list)
     const cleaned = links.map((l) => (l.clientId === clientId && l.practice && !valid.has(l.practice) ? { ...l, practice: null } : l))
-    if (cleaned.some((l, i) => l !== links[i])) await persistLinks(cleaned)
+    const linksChanged = cleaned.some((l, i) => l !== links[i])
+    if (linksChanged) await persistLinks(cleaned)
     await supabase.from('clients').update({ info, updated_at: new Date().toISOString() }).eq('id', clientId)
+    // Capture an undo so this stays reversible from within the profile.
+    setUndo({ clientId, restore: async () => {
+      setClients((cs) => cs.map((x) => (x.id === clientId ? { ...x, info: prevInfo } : x)))
+      if (linksChanged) await persistLinks(prevLinks)
+      await supabase.from('clients').update({ info: prevInfo, updated_at: new Date().toISOString() }).eq('id', clientId)
+    } })
     showToast('Practices updated ✓')
   }
 
@@ -595,6 +604,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const [newTier, setNewTier] = useState('')
   const [editOpen, setEditOpen] = useState(false)
   const [billingModal, setBillingModal] = useState(null)
+  const [confirmPrac, setConfirmPrac] = useState(null)
   const info = c.info || {}
   const cadence = info.metricsCadence || info.info?.metricsCadence || 'daily'
   const practices = getPractices(c)
@@ -632,7 +642,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <div style={{ gridColumn: '1 / -1' }}><StaffCard staff={staffObjs} /></div>
         </div>
         <NotesSection client={c} onSave={onSaveNotes} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'stretch' }}>
           <div style={sectionCard}>
             <SectionTitle>Membership / tiers</SectionTitle>
             <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Tag this client with every tier they belong to.</div>
@@ -646,15 +656,6 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
               <input style={{ ...inp, flex: 1 }} value={newTier} onChange={(e) => setNewTier(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (onAddTier(newTier), setNewTier(''))} placeholder="Add a tier (e.g. VIP)" />
               <button style={btnPrimary} onClick={() => { onAddTier(newTier); setNewTier('') }}>Add tier</button>
-            </div>
-            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid rgba(0,0,0,0.08)' }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: TEXT }}>Metrics tracking</div>
-              <div style={{ fontSize: 12, color: MUTED, margin: '2px 0 9px' }}>How often this client reports their numbers.</div>
-              <div style={{ display: 'inline-flex', gap: 4, background: '#eeece8', borderRadius: 999, padding: 3 }}>
-                {[['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, label]) => { const on = cadence === v; return (
-                  <button key={v} onClick={() => onSetCadence(c.id, v)} style={{ padding: '5px 18px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
-                )})}
-              </div>
             </div>
           </div>
           <div style={sectionCard}>
@@ -674,6 +675,15 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           </div>
         </div>
         <div style={{ ...sectionCard, marginBottom: 16 }}>
+          <SectionTitle>Metrics tracking</SectionTitle>
+          <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>How often this client reports their numbers. Weekly clients enter one set of totals per week instead of per day.</div>
+          <div style={{ display: 'inline-flex', gap: 4, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+            {[['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, label]) => { const on = cadence === v; return (
+              <button key={v} onClick={() => onSetCadence(c.id, v)} style={{ padding: '6px 20px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{label}</button>
+            )})}
+          </div>
+        </div>
+        <div style={{ ...sectionCard, marginBottom: 16 }}>
           <SectionTitle>Practices / locations</SectionTitle>
           <div style={{ fontSize: 12, color: MUTED, margin: '8px 0 12px' }}>Add each location, then tag a link to a location when you create it.</div>
           {infoField(c, 'locations') && (
@@ -685,7 +695,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {practices.length === 0 && <span style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>No extra locations — this client has one practice.</span>}
             {practices.map((p) => { const pc = practiceColor(p); return (
-              <span key={p} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: pc.txt, background: pc.bg, borderRadius: 8, padding: '4px 10px' }}>{p}<button onClick={() => onSavePractices(c.id, practices.filter((x) => x !== p))} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: pc.txt, fontSize: 15, lineHeight: 1, padding: 0 }}>×</button></span>
+              <span key={p} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: pc.txt, background: pc.bg, borderRadius: 8, padding: '4px 10px' }}>{p}<button onClick={() => setConfirmPrac(p)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: pc.txt, fontSize: 15, lineHeight: 1, padding: 0 }}>×</button></span>
             )})}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -719,6 +729,18 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
       {linkEdit && <LinkModal modal={linkEdit} link={linkEdit.id ? links.find((l) => l.id === linkEdit.id) : null} clients={clients} onSave={(f) => { onSaveLink(f); setLinkEdit(null) }} onDelete={(id) => { onDeleteLink(id); setLinkEdit(null) }} onClose={() => setLinkEdit(null)} />}
       {editOpen && <EditClientModal client={c} onSave={(f) => { onSaveClient(c.id, f); setEditOpen(false) }} onDelete={() => onDeleteClient(c.id)} onClose={() => setEditOpen(false)} />}
       {billingModal && <AccountingModal modal={{ ...billingModal, clientId: c.id }} client={c} onClose={() => setBillingModal(null)} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} onSaveBilling={onSaveBilling} onEditPayment={onEditPayment} />}
+      {confirmPrac && (
+        <div onClick={() => setConfirmPrac(null)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 380 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: NAVY, marginBottom: 8 }}>Delete this practice location?</h3>
+            <p style={{ fontSize: 13, color: MUTED, marginBottom: 20, lineHeight: 1.6 }}><strong style={{ color: TEXT }}>{confirmPrac}</strong> will be removed, and any links tagged to it will move to “All”. You can undo this right after.</p>
+            <div style={modalActions}>
+              <button style={btnGhost} onClick={() => setConfirmPrac(null)}>Cancel</button>
+              <button style={{ ...btnPrimary, background: '#A32D2D' }} onClick={() => { onSavePractices(c.id, practices.filter((x) => x !== confirmPrac)); setConfirmPrac(null) }}>Delete location</button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <Toast msg={toast} />}
     </div>
   )

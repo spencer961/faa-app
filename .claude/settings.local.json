@@ -32,7 +32,8 @@
       "Bash(git commit -q -m 'Metrics: simplify daily list — drop subheadings + alternating, align top bar, widen 20% *)",
       "Bash(git commit -q -m 'Metrics: left-align daily sheet, keep top bar fixed across tabs *)",
       "Bash(git commit -q -m 'Metrics: per-client daily/weekly tracking cadence *)",
-      "Bash(git commit -q -m 'Metrics: add Weeks sheet bulk-paste for weekly clients *)"
+      "Bash(git commit -q -m 'Metrics: add Weeks sheet bulk-paste for weekly clients *)",
+      "Bash(git commit -q -m 'Profile: separate Metrics tracking section, match card heights, fix practice delete+undo *)"
     ]
   }
 }
