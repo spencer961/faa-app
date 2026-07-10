@@ -187,7 +187,7 @@ function ClientView({ clients, data, setData }) {
 
   return (
     <>
-      <div className={'cv-head' + (period === 'daily' ? ' narrow' : '')}>
+      <div className="cv-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, color: '#888786' }}>Client:</span>
           <select className="slim" value={cid || ''} onChange={(e) => setCid(parseInt(e.target.value))}>
@@ -497,8 +497,7 @@ const CSS = `
 .mx .entry-bar{padding:12px 16px;border-bottom:0.5px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .mx .nav-btn{width:30px;height:30px;border:0.5px solid rgba(0,0,0,0.12);border-radius:6px;background:transparent;cursor:pointer;font-size:16px;line-height:1;color:#1a1a1a;}
 .mx .today-pill{padding:2px 10px;border-radius:10px;border:1.5px solid #bc9762;color:#bc9762;font-size:11px;font-weight:600;}
-.mx .cv-head.narrow{max-width:576px;margin-left:auto;margin-right:auto;}
-.mx .entry-card.narrow{max-width:576px;margin:0 auto;}
+.mx .entry-card.narrow{max-width:576px;}
 .mx .sheet-tip{padding:8px 16px;font-size:11px;color:#888786;background:#f9f9f8;border-bottom:0.5px solid rgba(0,0,0,0.06);}
 .mx .sheet-tip kbd{font-family:inherit;font-size:10px;background:#fff;border:0.5px solid rgba(0,0,0,0.2);border-radius:4px;padding:1px 5px;color:#1a1a1a;}
 .mx .sheet-list{padding:0 0 6px;}

@@ -29,7 +29,8 @@
       "Bash(git commit -q -m 'Metrics: add Month sheet view for bulk paste entry *)",
       "Bash(git commit -q -m 'Metrics: refine daily list — narrower, alternating rows, cleaner sections *)",
       "Bash(git commit -q -m 'Metrics: section subheadings become gold text instead of grey band *)",
-      "Bash(git commit -q -m 'Metrics: simplify daily list — drop subheadings + alternating, align top bar, widen 20% *)"
+      "Bash(git commit -q -m 'Metrics: simplify daily list — drop subheadings + alternating, align top bar, widen 20% *)",
+      "Bash(git commit -q -m 'Metrics: left-align daily sheet, keep top bar fixed across tabs *)"
     ]
   }
 }
