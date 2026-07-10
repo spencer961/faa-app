@@ -118,6 +118,16 @@ function HomeView({ clients, snaps, onOpen, onForm, onAssess }) {
 }
 const clientSnapsSorted = (arr) => [...(arr || [])].sort((a, b) => new Date(a.date) - new Date(b.date))
 
+// Friendly, client-facing status words + colors for the report.
+const SMAP = { green: ['#22c55e', 'Strong'], yellow: ['#f59e0b', 'Building'], red: ['#ef4444', 'Needs attention'] }
+// A plain-language read on the overall health score.
+function healthSummary(h) {
+  if (h >= 70) return { word: 'Thriving', line: 'Your practice is in great shape — keep the momentum going.' }
+  if (h >= 40) return { word: 'On track', line: 'Solid progress. A few focused wins will push you higher.' }
+  if (h >= 20) return { word: 'Building', line: "You're building your foundation — a few focused wins will move this fast." }
+  return { word: 'Early stage', line: "You're just getting started — small wins here add up quickly." }
+}
+
 // ── CLIENT MAP ────────────────────────────────────────────────────────
 function ClientMap({ client, snaps, selM, setSelM, exp, setExp, onBack, onAssess, onForm }) {
   if (!snaps.length) {
@@ -139,6 +149,7 @@ function ClientMap({ client, snaps, selM, setSelM, exp, setExp, onBack, onAssess
   const DL = leafIds(CATS)
   const counts = { g: DL.filter((id) => (ds[id] || 'red') === 'green').length, y: DL.filter((id) => (ds[id] || 'red') === 'yellow').length, r: DL.filter((id) => (ds[id] || 'red') === 'red').length }
   const dh = health(ds)
+  const hs = healthSummary(dh)
   const si = snaps.findIndex((s) => s.id === det.id)
   const prev = si > 0 ? snaps[si - 1] : null
   const delta = prev ? dh - health(prev.scores) : null
@@ -159,43 +170,75 @@ function ClientMap({ client, snaps, selM, setSelM, exp, setExp, onBack, onAssess
           ))}</div>
         </div>
         {det.notes && <div style={{ ...CARD, marginBottom: 16, borderLeft: '3px solid ' + GOLD }}><div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Consultant Notes</div><div style={{ fontSize: 13, color: MUTED, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{det.notes}</div></div>}
-        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
-          <div style={{ ...CARD, textAlign: 'center', borderTop: '3px solid ' + NAVY }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Health</div>
-            <div style={{ fontSize: 38, fontWeight: 700, color: NAVY, lineHeight: 1 }}>{dh}<span style={{ fontSize: 16 }}>%</span></div>
-            {delta !== null && <div style={{ fontSize: 11, marginTop: 5, color: delta >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600, background: delta >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: 20, padding: '2px 8px', display: 'inline-block' }}>{delta >= 0 ? '↑' : '↓'}{Math.abs(delta)}% vs {prev.label}</div>}
+        <div style={{ ...CARD, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 44, fontWeight: 700, color: NAVY, lineHeight: 1 }}>{dh}<span style={{ fontSize: 20 }}>%</span></div>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: dh >= 70 ? '#15803d' : '#92600b', background: dh >= 70 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.14)', borderRadius: 999, padding: '3px 11px' }}>{hs.word}</span>
+                {delta !== null && <span style={{ fontSize: 12, fontWeight: 600, color: delta >= 0 ? '#16a34a' : '#dc2626' }}>{delta >= 0 ? '↑' : '↓'} {Math.abs(delta)} pts since {prev.label}</span>}
+              </div>
+              <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>{hs.line}</div>
+            </div>
           </div>
-          {[['Strong', counts.g, '#22c55e'], ['In Progress', counts.y, '#f59e0b'], ['Needs Work', counts.r, '#ef4444']].map(([l, n, c]) => (
-            <div key={l} style={{ ...CARD, borderTop: '3px solid ' + c }}><div style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{l}</div><div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}><span style={{ fontSize: 34, fontWeight: 700, color: c, lineHeight: 1 }}>{n}</span><span style={{ fontSize: 12, color: '#c0c6d8' }}>/ {DL.length}</span></div><div style={{ marginTop: 8, height: 3, background: BORDER, borderRadius: 2 }}><div style={{ height: '100%', width: (n / DL.length * 100) + '%', background: c, borderRadius: 2 }} /></div></div>
-          ))}
+          <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', gap: 2, marginBottom: 8 }}>
+            {counts.g > 0 && <div style={{ flex: counts.g, background: '#22c55e' }} />}
+            {counts.y > 0 && <div style={{ flex: counts.y, background: '#f59e0b' }} />}
+            {counts.r > 0 && <div style={{ flex: counts.r, background: '#ef4444' }} />}
+          </div>
+          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: MUTED, flexWrap: 'wrap' }}>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', verticalAlign: 'middle', marginRight: 5 }} />{counts.g} strong</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', verticalAlign: 'middle', marginRight: 5 }} />{counts.y} building</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#ef4444', verticalAlign: 'middle', marginRight: 5 }} />{counts.r} need attention</span>
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 12, marginBottom: 16 }}>
-          {CATS.map((cat) => {
-            const g = cat.items.filter((i) => pScore(ds, i) === 'green').length, y = cat.items.filter((i) => pScore(ds, i) === 'yellow').length, r = cat.items.filter((i) => pScore(ds, i) === 'red').length
-            const pt = Math.round((g / cat.items.length) * 100), io = exp[cat.id]
-            return (
-              <div key={cat.id} style={CARD}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none', marginBottom: 10 }} onClick={() => setExp((e) => ({ ...e, [cat.id]: !e[cat.id] }))}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{cat.name}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 18, fontWeight: 700, color: pt >= 70 ? '#22c55e' : pt >= 40 ? '#f59e0b' : '#ef4444' }}>{pt}%</span><span style={{ color: '#c0c6d8', fontSize: 10 }}>{io ? '▲' : '▼'}</span></div>
+        {redItems.length > 0 && (
+          <div style={{ ...CARD, border: '1.5px solid ' + NAVY, marginBottom: 18 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 2 }}>Focus here next</div>
+            <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>{(() => { const n = redItems.reduce((a, x) => a + x.items.length, 0); return n + ' area' + (n !== 1 ? 's' : '') + ' that need attention most this month' })()}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {redItems.flatMap((x) => x.items.map((item) => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 12px' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, flex: 1 }}>{item.name}</span>
+                  <span style={{ fontSize: 11, color: MUTED }}>{x.cat}</span>
                 </div>
-                <div style={{ display: 'flex', height: 5, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 8 }}>{g > 0 && <div style={{ flex: g, background: '#22c55e', minWidth: 3 }} />}{y > 0 && <div style={{ flex: y, background: '#f59e0b', minWidth: 3 }} />}{r > 0 && <div style={{ flex: r, background: '#ef4444', minWidth: 3 }} />}</div>
-                <div style={{ display: 'flex', gap: 14 }}><span style={{ fontSize: 11, color: '#22c55e', fontWeight: 500 }}>● {g}</span><span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 500 }}>● {y}</span><span style={{ fontSize: 11, color: '#ef4444', fontWeight: 500 }}>● {r}</span></div>
-                {io && <div style={{ marginTop: 12, borderTop: '1px solid ' + BORDER, paddingTop: 8 }}>{cat.items.map((item) => { const s = pScore(ds, item); return (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 4px', borderBottom: '1px solid ' + BORDER }}><span style={{ fontSize: 13, color: TEXT }}>{item.name}</span><Dot s={s} size={22} /></div>
-                )})}</div>}
+              )))}
+            </div>
+          </div>
+        )}
+        <div style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, paddingLeft: 2 }}>By area</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {CATS.map((cat) => {
+            const g = cat.items.filter((i) => pScore(ds, i) === 'green').length
+            const r = cat.items.filter((i) => pScore(ds, i) === 'red').length
+            const pct = Math.round((g / cat.items.length) * 100), io = exp[cat.id]
+            return (
+              <div key={cat.id} style={{ background: '#fff', border: '0.5px solid ' + BORDER, borderRadius: 10, overflow: 'hidden' }}>
+                <div onClick={() => setExp((e) => ({ ...e, [cat.id]: !e[cat.id] }))} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer', userSelect: 'none' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, color: TEXT }}>{cat.name}</span>
+                      {r > 0 && <span style={{ fontSize: 11, color: '#b91c1c', background: 'rgba(239,68,68,0.1)', borderRadius: 999, padding: '1px 8px' }}>{r} need attention</span>}
+                    </div>
+                    <div style={{ height: 6, background: BG, borderRadius: 3, overflow: 'hidden' }}><div style={{ height: '100%', width: pct + '%', background: '#22c55e', borderRadius: 3 }} /></div>
+                  </div>
+                  <div style={{ fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>{g} of {cat.items.length} strong</div>
+                  <span style={{ color: '#c0c6d8', fontSize: 10 }}>{io ? '▲' : '▼'}</span>
+                </div>
+                {io && <div style={{ borderTop: '0.5px solid ' + BORDER, padding: '2px 14px 6px' }}>
+                  {cat.items.map((item, ii) => { const sm = SMAP[pScore(ds, item)]; return (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: ii < cat.items.length - 1 ? '0.5px solid ' + BORDER : 'none' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: sm[0], flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: TEXT, flex: 1 }}>{item.name}</span>
+                      <span style={{ fontSize: 11, color: MUTED }}>{sm[1]}</span>
+                    </div>
+                  )})}
+                </div>}
               </div>
             )
           })}
         </div>
-        {redItems.length > 0 && (
-          <div style={{ ...CARD, border: '1px solid #fca5a5', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>● Priority Focus — {redItems.reduce((a, x) => a + x.items.length, 0)} areas need attention</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{redItems.map((x) => (
-              <div key={x.cat}><div style={{ fontSize: 10, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>{x.cat} <span style={{ color: '#ef4444' }}>({x.items.length})</span></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 6 }}>{x.items.map((item) => <div key={item.id} style={{ padding: '9px 12px', borderRadius: 8, background: '#fff5f5', border: '1px solid #fecaca', fontSize: 13, fontWeight: 600, color: TEXT }}>{item.name}</div>)}</div></div>
-            ))}</div>
-          </div>
-        )}
       </div>
     </div>
   )
