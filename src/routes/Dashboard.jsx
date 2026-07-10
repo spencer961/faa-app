@@ -310,7 +310,7 @@ export default function Dashboard() {
         clientMode ? (
           <button onClick={() => setEndModal(true)} title="You're in Client Mode — click to end" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(24,168,102,0.18)', border: '0.5px solid rgba(24,168,102,0.55)', color: '#fff', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
-            Client Mode: {clients.find((c) => c.id === clientMode)?.name || ''}
+            {clients.find((c) => c.id === clientMode)?.name || ''}
           </button>
         ) : (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -662,7 +662,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← Back</button>
           <button onClick={onExitClientMode} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(24,232,138,0.14)', border: '0.5px solid rgba(24,232,138,0.4)', color: '#18e88a', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
-            Client Mode: {clientModeName}
+            {clientModeName}
           </button>
         </div>
       ) : (
@@ -685,11 +685,15 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
           <button onClick={() => document.getElementById('files-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginLeft: 'auto', height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: 'rgba(11,29,94,0.05)', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>View Files ↓</button>
         </div>
-        {(showSec('contact') || showSec('staff') || showSec('metrics')) && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        {showSec('contact') && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <InfoCard label="Doctor / primary contact" value={infoField(c, 'doctor') || c.doctor} />
+            <InfoCard label="Website" value={infoField(c, 'website')} href={infoField(c, 'website') ? websiteUrl(infoField(c, 'website')) : undefined} />
+          </div>
+        )}
+        {(showSec('contact') || showSec('metrics')) && (
+          <div style={{ display: 'grid', gridTemplateColumns: (showSec('contact') && showSec('metrics')) ? '2fr 1fr 1fr' : showSec('contact') ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 12 }}>
             {showSec('contact') && <>
-              <InfoCard label="Doctor / primary contact" value={infoField(c, 'doctor') || c.doctor} />
-              <InfoCard label="Website" value={infoField(c, 'website')} href={infoField(c, 'website') ? websiteUrl(infoField(c, 'website')) : undefined} />
               <InfoCard label="Time zone" value={infoField(c, 'timezone')} />
               <InfoCard label="No. of locations" value={infoField(c, 'numLocations')} />
             </>}
@@ -703,9 +707,9 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
                 </div>
               </div>
             )}
-            {showSec('staff') && <div style={{ gridColumn: '1 / -1' }}><StaffCard staff={staffObjs} /></div>}
           </div>
         )}
+        {showSec('staff') && <div style={{ marginBottom: 16 }}><StaffCard staff={staffObjs} /></div>}
         {showSec('notes') && <NotesSection client={c} onSave={onSaveNotes} clientMode={clientMode} cmSince={cmSince} />}
         {(showSec('membership') || showSec('billing')) && (
         <div style={{ display: 'grid', gridTemplateColumns: (showSec('membership') && showSec('billing')) ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16, alignItems: 'stretch' }}>
