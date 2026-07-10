@@ -120,6 +120,9 @@ const clientSnapsSorted = (arr) => [...(arr || [])].sort((a, b) => new Date(a.da
 
 // Friendly, client-facing status words + colors for the report.
 const SMAP = { green: ['#22c55e', 'Strong'], yellow: ['#f59e0b', 'Building'], red: ['#ef4444', 'Needs attention'] }
+// Shared layout for the scoring-panel screens: 20% left / 25% right page margins
+// on desktop, dropped on tablet + mobile.
+const SM_GRID_CSS = `.sm-assess-grid{padding:0 25% 0 20%;}@media(max-width:1024px){.sm-assess-grid{padding:0;}}`
 // A one-word, plain-language read on the overall health score.
 function healthSummary(h) {
   if (h >= 70) return 'Thriving'
@@ -261,7 +264,7 @@ function Assessment({ client, ass, setAss, cycleScore, onCancel, onPublish }) {
         <HdrBtn onClick={onCancel}>← Cancel</HdrBtn>
         <button onClick={onPublish} disabled={!ass.label.trim()} style={{ ...BTNP, background: GOLD, color: NAVY, opacity: ass.label.trim() ? 1 : 0.5 }}>Publish Assessment →</button>
       </div>} />
-      <style>{`.sm-assess-grid{padding:0 25% 0 20%;}@media(max-width:1024px){.sm-assess-grid{padding:0;}}`}</style>
+      <style>{SM_GRID_CSS}</style>
       <div className="sm-assess-grid" style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', flex: 1, overflow: 'hidden' }}>
         <div style={{ overflowY: 'auto', padding: 20 }}>
           <div style={{ ...CARD, marginBottom: 16, borderLeft: '3px solid ' + GOLD }}>
@@ -295,13 +298,14 @@ function Assessment({ client, ass, setAss, cycleScore, onCancel, onPublish }) {
 function FormReview({ client, snaps, onBack, onAssess }) {
   const a = client.answers || {}
   return (
-    <div style={{ background: BG, minHeight: '100vh' }}>
+    <div style={{ background: BG, display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Header sub="Form Review" right={<div style={{ display: 'flex', gap: 8 }}>
         <HdrBtn onClick={onBack}>← All clients</HdrBtn>
         <button onClick={onAssess} style={{ ...BTNP, background: GOLD, color: NAVY }}>{snaps.length ? 'New Assessment →' : 'Start Assessment →'}</button>
       </div>} />
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 56px)' }}>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <style>{SM_GRID_CSS}</style>
+      <div className="sm-assess-grid" style={{ display: 'grid', gridTemplateColumns: snaps.length ? '1.3fr 1fr' : '1fr', flex: 1, overflow: 'hidden' }}>
+        <div style={{ overflowY: 'auto', padding: 24 }}>
           <div style={{ maxWidth: 680 }}>
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Onboarding Form</div>
@@ -325,7 +329,7 @@ function FormReview({ client, snaps, onBack, onAssess }) {
             <div style={{ height: 40 }} />
           </div>
         </div>
-        {snaps.length > 0 && <ScoringPanel scores={snaps[snaps.length - 1].scores} onCycle={null} />}
+        {snaps.length > 0 && <ScoringPanel scores={snaps[snaps.length - 1].scores} onCycle={null} fillCell />}
       </div>
     </div>
   )
