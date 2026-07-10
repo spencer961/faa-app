@@ -41,7 +41,8 @@
       "Bash(git commit -q -m 'Client Mode menu hidden; link delete confirm+undo; Super Admin settings page *)",
       "Bash(git commit -q -m 'Client Mode: profile button now prompts to end instead of exiting silently *)",
       "Bash(git commit -q -m 'Super Admin: merge settings against fresh app_state to avoid clobbering links *)",
-      "Bash(git commit -q -m 'Success Map: redesign the client report to be calmer and easier to read *)"
+      "Bash(git commit -q -m 'Success Map: redesign the client report to be calmer and easier to read *)",
+      "Bash(git commit -q -m 'Success Map: add expand/collapse-all toggle, drop the encouraging line *)"
     ]
   }
 }

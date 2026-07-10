@@ -120,12 +120,12 @@ const clientSnapsSorted = (arr) => [...(arr || [])].sort((a, b) => new Date(a.da
 
 // Friendly, client-facing status words + colors for the report.
 const SMAP = { green: ['#22c55e', 'Strong'], yellow: ['#f59e0b', 'Building'], red: ['#ef4444', 'Needs attention'] }
-// A plain-language read on the overall health score.
+// A one-word, plain-language read on the overall health score.
 function healthSummary(h) {
-  if (h >= 70) return { word: 'Thriving', line: 'Your practice is in great shape — keep the momentum going.' }
-  if (h >= 40) return { word: 'On track', line: 'Solid progress. A few focused wins will push you higher.' }
-  if (h >= 20) return { word: 'Building', line: "You're building your foundation — a few focused wins will move this fast." }
-  return { word: 'Early stage', line: "You're just getting started — small wins here add up quickly." }
+  if (h >= 70) return 'Thriving'
+  if (h >= 40) return 'On track'
+  if (h >= 20) return 'Building'
+  return 'Early stage'
 }
 
 // ── CLIENT MAP ────────────────────────────────────────────────────────
@@ -175,10 +175,9 @@ function ClientMap({ client, snaps, selM, setSelM, exp, setExp, onBack, onAssess
             <div style={{ fontSize: 44, fontWeight: 700, color: NAVY, lineHeight: 1 }}>{dh}<span style={{ fontSize: 20 }}>%</span></div>
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: dh >= 70 ? '#15803d' : '#92600b', background: dh >= 70 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.14)', borderRadius: 999, padding: '3px 11px' }}>{hs.word}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: dh >= 70 ? '#15803d' : '#92600b', background: dh >= 70 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.14)', borderRadius: 999, padding: '3px 11px' }}>{hs}</span>
                 {delta !== null && <span style={{ fontSize: 12, fontWeight: 600, color: delta >= 0 ? '#16a34a' : '#dc2626' }}>{delta >= 0 ? '↑' : '↓'} {Math.abs(delta)} pts since {prev.label}</span>}
               </div>
-              <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>{hs.line}</div>
             </div>
           </div>
           <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', gap: 2, marginBottom: 8 }}>
@@ -207,7 +206,12 @@ function ClientMap({ client, snaps, selM, setSelM, exp, setExp, onBack, onAssess
             </div>
           </div>
         )}
-        <div style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, paddingLeft: 2 }}>By area</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingLeft: 2 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>By area</span>
+          {(() => { const allOpen = CATS.every((c) => exp[c.id]); return (
+            <button onClick={() => setExp(allOpen ? {} : Object.fromEntries(CATS.map((c) => [c.id, true])))} style={{ background: 'none', border: 'none', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}>{allOpen ? 'Collapse all' : 'Expand all'}</button>
+          ) })()}
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {CATS.map((cat) => {
             const g = cat.items.filter((i) => pScore(ds, i) === 'green').length
