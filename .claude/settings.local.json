@@ -52,7 +52,8 @@
       "Bash(git commit -q -m 'Add Client Pulse — a shared client review desk *)",
       "Bash(git commit -q -m 'Client Pulse: expanded skim view + log checked-off items to client notes *)",
       "Bash(git commit -q -m 'Notes: compact Apple Notes-style layout \\(bold date + title, tight rows\\) *)",
-      "Bash(git commit -q -m 'Client Pulse: assistant/consultant modes, comment notifications, email links *)"
+      "Bash(git commit -q -m 'Client Pulse: assistant/consultant modes, comment notifications, email links *)",
+      "Bash(git commit -q -m 'Dashboard cards: to-review pill with expand arrow, opens the review desk *)"
     ]
   }
 }

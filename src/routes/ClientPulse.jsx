@@ -27,9 +27,9 @@ export default function ClientPulse() {
   const [clients, setClients] = useState([])
   const [tasks, setTasks] = useState([])
   const [snaps] = useState(loadSnaps)
-  const [sel, setSel] = useState(null)
-  const [filter, setFilter] = useState('consulting')
   const [searchParams] = useSearchParams()
+  const [sel, setSel] = useState(searchParams.get('client') ? parseInt(searchParams.get('client')) : null)
+  const [filter, setFilter] = useState('consulting')
   // Two roles until logins land: the assistant (full control) and the
   // consultant (read + check off + comment). The dashboard link opens
   // ?mode=consultant; the toggle lets you switch for now.
