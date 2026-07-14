@@ -73,6 +73,7 @@ export default function ClientPulse() {
 }
 
 function Overview({ groups, filter, setFilter, onOpen, openTasks, clientHealth, reviewOpen, fyiOpen }) {
+  const [view, setView] = useState('expanded')
   const total = groups.reduce((a, g) => a + g.items.length, 0)
   return (
     <>
@@ -81,10 +82,17 @@ function Overview({ groups, filter, setFilter, onOpen, openTasks, clientHealth, 
           <h1 style={{ fontSize: 22, fontWeight: 600, color: TEXT, margin: 0 }}>Client Pulse</h1>
           <p style={{ fontSize: 13, color: MUTED, marginTop: 3, maxWidth: 460, lineHeight: 1.5 }}>What needs you across your clients — the docs to review and the heads-up your assistant leaves, all in one place.</p>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[['consulting', 'Consulting'], ['all', 'All clients']].map(([v, l]) => (
-            <button key={v} onClick={() => setFilter(v)} style={pill(filter === v)}>{l}</button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+            {[['expanded', 'Expanded'], ['compact', 'Compact']].map(([v, l]) => (
+              <button key={v} onClick={() => setView(v)} style={{ padding: '5px 12px', borderRadius: 999, border: 'none', background: view === v ? '#fff' : 'transparent', color: view === v ? NAVY : MUTED, fontSize: 12, fontWeight: view === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{l}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[['consulting', 'Consulting'], ['all', 'All clients']].map(([v, l]) => (
+              <button key={v} onClick={() => setFilter(v)} style={pill(filter === v)}>{l}</button>
+            ))}
+          </div>
         </div>
       </div>
       {total === 0 && <div style={{ textAlign: 'center', color: MUTED, padding: 50, fontStyle: 'italic' }}>No clients here yet.</div>}
@@ -95,33 +103,78 @@ function Overview({ groups, filter, setFilter, onOpen, openTasks, clientHealth, 
             <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED }}>{g.label}</span>
             <span style={{ fontSize: 11, color: MUTED }}>({g.items.length})</span>
           </div>
-          <div style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10, overflow: 'hidden' }}>
-            {g.items.map((c, i) => {
-              const st = STATUSES.find((s) => s[0] === c.info?.status)
-              const rO = reviewOpen(c), fO = fyiOpen(c), h = clientHealth(c.id), ot = openTasks(c.id)
-              return (
-                <div key={c.id} onClick={() => onOpen(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderLeft: '3px solid ' + g.color, borderBottom: i < g.items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', cursor: 'pointer' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: TEXT }}>{c.name}</span>
-                      {st && <span style={{ fontSize: 11, color: st[2], background: st[3], borderRadius: 999, padding: '1px 9px' }}>{st[1]}</span>}
+          {view === 'compact' ? (
+            <div style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10, overflow: 'hidden' }}>
+              {g.items.map((c, i) => {
+                const st = STATUSES.find((s) => s[0] === c.info?.status)
+                const rO = reviewOpen(c), fO = fyiOpen(c), h = clientHealth(c.id), ot = openTasks(c.id)
+                return (
+                  <div key={c.id} onClick={() => onOpen(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderLeft: '3px solid ' + g.color, borderBottom: i < g.items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', cursor: 'pointer' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: TEXT }}>{c.name}</span>
+                        {st && <span style={{ fontSize: 11, color: st[2], background: st[3], borderRadius: 999, padding: '1px 9px' }}>{st[1]}</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: (rO || fO) ? '#8a6a3c' : MUTED, marginTop: 3 }}>
+                        {(rO || fO) ? [rO ? rO + ' to review' : null, fO ? fO + ' heads-up' : null].filter(Boolean).join(' · ') : 'All caught up'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: (rO || fO) ? '#8a6a3c' : MUTED, marginTop: 3 }}>
-                      {(rO || fO) ? [rO ? rO + ' to review' : null, fO ? fO + ' heads-up' : null].filter(Boolean).join(' · ') : 'All caught up'}
+                    <div style={{ display: 'flex', gap: 14, fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>
+                      <span title="Open to-dos">{ot} to-dos</span>
+                      {h !== null && <span title="Success Map health">{h}% health</span>}
                     </div>
+                    <span style={{ color: '#c0c6d8', fontSize: 15 }}>›</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 14, fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>
-                    <span title="Open to-dos">{ot} to-dos</span>
-                    {h !== null && <span title="Success Map health">{h}% health</span>}
-                  </div>
-                  <span style={{ color: '#c0c6d8', fontSize: 15 }}>›</span>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 10 }}>
+              {g.items.map((c) => <ExpandedCard key={c.id} c={c} color={g.color} onOpen={onOpen} ot={openTasks(c.id)} h={clientHealth(c.id)} />)}
+            </div>
+          )}
         </div>
       ))}
     </>
+  )
+}
+
+function ExpandedCard({ c, color, onOpen, ot, h }) {
+  const st = STATUSES.find((s) => s[0] === c.info?.status)
+  const rev = (c.info?.reviewItems || []).filter((i) => !i.done)
+  const fyi = (c.info?.headsUp || []).filter((i) => !i.seen)
+  const line = (it) => (
+    <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#c0c6d8', flexShrink: 0 }} />
+      <span style={{ fontSize: 13, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</span>
+      {it.kind && <span style={{ fontSize: 10, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 4, padding: '0 5px', flexShrink: 0 }}>{it.kind}</span>}
+    </div>
+  )
+  return (
+    <div onClick={() => onOpen(c.id)} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '3px solid ' + color, borderRadius: 10, padding: '13px 15px', cursor: 'pointer' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: (rev.length || fyi.length) ? 10 : 0 }}>
+        <span style={{ fontSize: 15, fontWeight: 500, color: TEXT }}>{c.name}</span>
+        {st && <span style={{ fontSize: 11, color: st[2], background: st[3], borderRadius: 999, padding: '1px 9px' }}>{st[1]}</span>}
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>
+          <span title="Open to-dos">{ot} to-dos</span>{h !== null && <span title="Success Map health">{h}%</span>}
+        </span>
+      </div>
+      {rev.length > 0 && (
+        <div style={{ marginBottom: fyi.length ? 10 : 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#8a6a3c', marginBottom: 3 }}>To review ({rev.length})</div>
+          {rev.slice(0, 4).map(line)}
+          {rev.length > 4 && <div style={{ fontSize: 11, color: MUTED, paddingLeft: 14 }}>+{rev.length - 4} more</div>}
+        </div>
+      )}
+      {fyi.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#92600b', marginBottom: 3 }}>Heads up ({fyi.length})</div>
+          {fyi.slice(0, 4).map(line)}
+          {fyi.length > 4 && <div style={{ fontSize: 11, color: MUTED, paddingLeft: 14 }}>+{fyi.length - 4} more</div>}
+        </div>
+      )}
+      {rev.length === 0 && fyi.length === 0 && <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic' }}>All caught up</div>}
+    </div>
   )
 }
 
@@ -132,6 +185,20 @@ function Individual({ c, onBack, openTasks, healthPct, patchClient, addItem, upd
   const review = info.reviewItems || []
   const heads = info.headsUp || []
   const notes = [...(info.notesLog || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  // Checking an item off logs it to the client notes (so the profile has the
+  // full record), the first time it's completed.
+  const toggleItem = (key, it, doneKey) => {
+    const nowDone = !it[doneKey]
+    const changes = { [doneKey]: nowDone }
+    const patchObj = {}
+    if (nowDone && !it.logged) {
+      changes.logged = true
+      const verb = key === 'reviewItems' ? 'Reviewed' : 'Noted'
+      patchObj.notesLog = [...(info.notesLog || []), { id: 'n' + Date.now(), text: verb + ': ' + it.title + (it.reply ? ' — ' + it.reply : ''), createdAt: new Date().toISOString(), editedAt: null, history: [], source: 'pulse' }]
+    }
+    patchObj[key] = (info[key] || []).map((x) => (x.id === it.id ? { ...x, ...changes } : x))
+    patchClient(c.id, patchObj)
+  }
   return (
     <>
       <button onClick={onBack} style={{ ...linkBtn, marginBottom: 14 }}>← Back to board</button>
@@ -155,13 +222,13 @@ function Individual({ c, onBack, openTasks, healthPct, patchClient, addItem, upd
 
       <Section title="To review" count={review.filter((i) => !i.done).length}>
         {review.length === 0 && <Empty>Nothing to review right now.</Empty>}
-        {review.map((it) => <ItemRow key={it.id} it={it} doneKey="done" hasLink onToggle={() => updateItem(c.id, 'reviewItems', it.id, { done: !it.done })} onReply={(v) => updateItem(c.id, 'reviewItems', it.id, { reply: v })} onRemove={() => removeItem(c.id, 'reviewItems', it.id)} />)}
+        {review.map((it) => <ItemRow key={it.id} it={it} doneKey="done" hasLink onToggle={() => toggleItem('reviewItems', it, 'done')} onReply={(v) => updateItem(c.id, 'reviewItems', it.id, { reply: v })} onRemove={() => removeItem(c.id, 'reviewItems', it.id)} />)}
         <ItemComposer hasLink onAdd={(o) => addItem(c.id, 'reviewItems', { id: uid(), done: false, reply: '', createdAt: new Date().toISOString(), ...o })} />
       </Section>
 
       <Section title="Heads up" count={heads.filter((i) => !i.seen).length}>
         {heads.length === 0 && <Empty>No heads-up items.</Empty>}
-        {heads.map((it) => <ItemRow key={it.id} it={it} doneKey="seen" onToggle={() => updateItem(c.id, 'headsUp', it.id, { seen: !it.seen })} onReply={(v) => updateItem(c.id, 'headsUp', it.id, { reply: v })} onRemove={() => removeItem(c.id, 'headsUp', it.id)} />)}
+        {heads.map((it) => <ItemRow key={it.id} it={it} doneKey="seen" onToggle={() => toggleItem('headsUp', it, 'seen')} onReply={(v) => updateItem(c.id, 'headsUp', it.id, { reply: v })} onRemove={() => removeItem(c.id, 'headsUp', it.id)} />)}
         <ItemComposer onAdd={(o) => addItem(c.id, 'headsUp', { id: uid(), seen: false, reply: '', createdAt: new Date().toISOString(), ...o })} />
       </Section>
 
