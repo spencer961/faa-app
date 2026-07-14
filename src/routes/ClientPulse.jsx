@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
 import { health as calcHealth } from '../lib/successMap.js'
 import { getClientTiers } from '../lib/tiers.js'
+import { clientColor } from '../lib/clientColor.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Client Pulse — a shared review desk between you and your assistant.
@@ -93,27 +94,17 @@ function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, o
   }
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 600, color: TEXT, margin: 0 }}>Client Pulse</h1>
           <p style={{ fontSize: 13, color: MUTED, marginTop: 3, maxWidth: 460, lineHeight: 1.5 }}>{mode === 'consultant' ? 'What needs your review across your clients — check items off and leave a comment for your assistant.' : 'What needs you across your clients — the docs to review and the heads-up your assistant leaves, all in one place.'}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
-            {[['assistant', 'Assistant'], ['consultant', 'Consultant']].map(([v, l]) => (
-              <button key={v} onClick={() => setMode(v)} style={{ padding: '5px 12px', borderRadius: 999, border: 'none', background: mode === v ? '#fff' : 'transparent', color: mode === v ? NAVY : MUTED, fontSize: 12, fontWeight: mode === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: mode === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{l}</button>
-            ))}
-          </div>
-          <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
-            {[['expanded', 'Expanded'], ['compact', 'Compact']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} style={{ padding: '5px 12px', borderRadius: 999, border: 'none', background: view === v ? '#fff' : 'transparent', color: view === v ? NAVY : MUTED, fontSize: 12, fontWeight: view === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{l}</button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[['consulting', 'Consulting'], ['all', 'All clients']].map(([v, l]) => (
-              <button key={v} onClick={() => setFilter(v)} style={pill(filter === v)}>{l}</button>
-            ))}
-          </div>
+        <ModeMenu mode={mode} setMode={setMode} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        <Toggle options={[['consulting', 'Consulting'], ['all', 'All clients']]} value={filter} onChange={setFilter} />
+        <div style={{ marginLeft: 'auto' }}>
+          <Toggle options={[['expanded', 'Expanded'], ['compact', 'Compact']]} value={view} onChange={setView} />
         </div>
       </div>
       {mode === 'assistant' && notes.length > 0 && (
@@ -146,8 +137,10 @@ function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, o
               {g.items.map((c, i) => {
                 const st = STATUSES.find((s) => s[0] === c.info?.status)
                 const rO = reviewOpen(c), fO = fyiOpen(c), h = clientHealth(c.id), ot = openTasks(c.id)
+                const cc = clientColor(c)
                 return (
-                  <div key={c.id} onClick={() => onOpen(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderLeft: '3px solid ' + g.color, borderBottom: i < g.items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', cursor: 'pointer' }}>
+                  <div key={c.id} onClick={() => onOpen(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderLeft: '4px solid ' + cc, borderBottom: i < g.items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', cursor: 'pointer' }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: cc, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 11, flexShrink: 0 }}>{ini(c.name)}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 14, fontWeight: 500, color: TEXT }}>{c.name}</span>
@@ -168,7 +161,7 @@ function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, o
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 10 }}>
-              {g.items.map((c) => <ExpandedCard key={c.id} c={c} color={g.color} onOpen={onOpen} ot={openTasks(c.id)} h={clientHealth(c.id)} />)}
+              {g.items.map((c) => <ExpandedCard key={c.id} c={c} color={clientColor(c)} onOpen={onOpen} ot={openTasks(c.id)} h={clientHealth(c.id)} />)}
             </div>
           )}
         </div>
@@ -191,6 +184,7 @@ function ExpandedCard({ c, color, onOpen, ot, h }) {
   return (
     <div onClick={() => onOpen(c.id)} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '3px solid ' + color, borderRadius: 10, padding: '13px 15px', cursor: 'pointer' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: (rev.length || fyi.length) ? 10 : 0 }}>
+        <span style={{ width: 26, height: 26, borderRadius: '50%', background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 10, flexShrink: 0 }}>{ini(c.name)}</span>
         <span style={{ fontSize: 15, fontWeight: 500, color: TEXT }}>{c.name}</span>
         {st && <span style={{ fontSize: 11, color: st[2], background: st[3], borderRadius: 999, padding: '1px 9px' }}>{st[1]}</span>}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>
@@ -253,7 +247,7 @@ function Individual({ c, mode, onBack, openTasks, healthPct, patchClient, addIte
     <>
       <button onClick={onBack} style={{ ...linkBtn, marginBottom: 14 }}>← Back to board</button>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, flexShrink: 0 }}>{ini(c.name)}</div>
+        <div style={{ width: 44, height: 44, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, flexShrink: 0 }}>{ini(c.name)}</div>
         <div style={{ flex: 1, minWidth: 180 }}>
           <div style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</div>
           <div style={{ fontSize: 12, color: MUTED }}>{openTasks} open to-dos{healthPct !== null ? ' · ' + healthPct + '% health' : ''}</div>
@@ -371,6 +365,51 @@ function Segmented({ options, value, onChange, colorMap }) {
   )
 }
 
+// A slim, reusable segmented toggle used for the board's view + filter.
+function Toggle({ options, value, onChange }) {
+  return (
+    <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+      {options.map(([v, l]) => { const on = value === v; return (
+        <button key={v} onClick={() => onChange(v)} style={{ padding: '4px 12px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 2px rgba(0,0,0,0.1)' : 'none' }}>{l}</button>
+      ) })}
+    </div>
+  )
+}
+
+// The assistant/consultant switch is a temporary stand-in until logins pick
+// the role automatically — so it's tucked into a quiet corner menu instead of
+// competing with the board's own controls.
+function ModeMenu({ mode, setMode }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button onClick={() => setOpen((o) => !o)} title="Switch view" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.12)', background: '#fff', color: MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+        <span style={{ color: TEXT, fontWeight: 500 }}>{mode === 'consultant' ? 'Consultant' : 'Assistant'}</span>
+        <span style={{ fontSize: 9 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: '#fff', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.16)', minWidth: 190, overflow: 'hidden', zIndex: 2000 }}>
+          <div style={{ padding: '8px 14px 5px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: MUTED }}>Viewing as</div>
+          {[['assistant', 'Assistant', 'Full control — add, edit, prep items'], ['consultant', 'Consultant', 'Review, check off, comment']].map(([v, l, d]) => (
+            <button key={v} onClick={() => { setMode(v); setOpen(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', border: 'none', background: mode === v ? '#f2f4f8' : '#fff', cursor: 'pointer', fontFamily: 'inherit', borderTop: '0.5px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: 13, fontWeight: mode === v ? 600 : 500, color: mode === v ? NAVY : TEXT }}>{l}{mode === v ? ' ✓' : ''}</div>
+              <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{d}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Section({ title, count, sub, children }) {
   return (
     <div style={{ marginBottom: 22 }}>
@@ -386,7 +425,6 @@ function Section({ title, count, sub, children }) {
 
 function Empty({ children }) { return <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic', padding: '4px 2px' }}>{children}</div> }
 
-const pill = (a) => ({ padding: '5px 14px', border: '0.5px solid ' + (a ? NAVY : 'rgba(0,0,0,0.15)'), borderRadius: 999, background: a ? NAVY : '#fff', color: a ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' })
 const fieldLabel = { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, marginBottom: 6 }
 const inp = { width: '100%', padding: '8px 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }
 const addRow = { display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', border: '0.5px dashed rgba(0,0,0,0.2)', borderRadius: 8, color: MUTED, fontSize: 13, cursor: 'pointer', background: 'none', width: '100%', fontFamily: 'inherit' }

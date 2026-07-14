@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -7,6 +7,7 @@ import { aggregate, METRICS, fmtVal } from '../lib/metrics.js'
 import { health } from '../lib/successMap.js'
 import { DEFAULT_TIERS, TIER_PALETTE, getClientTiers as getTiers } from '../lib/tiers.js'
 import { DSEC } from '../lib/onboardingSections.js'
+import { clientColor, CLIENT_PALETTE } from '../lib/clientColor.js'
 
 // Command center — migrated from dashboard.html (Pass 1: client directory,
 // quick-launch links/files, and client info detail view).
@@ -301,7 +302,7 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} clientModeName={clients.find((c) => c.id === clientMode)?.name || ''} onExitClientMode={() => { exitClientMode(); setDetailId(null) }} cmSince={cmSince} hiddenSections={cmHidden} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSetColor={(id, v) => patchInfo(id, { color: v })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} clientModeName={clients.find((c) => c.id === clientMode)?.name || ''} onExitClientMode={() => { exitClientMode(); setDetailId(null) }} cmSince={cmSince} hiddenSections={cmHidden} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
@@ -395,7 +396,7 @@ export default function Dashboard() {
             return (
               <div key={c.id} onClick={() => setDetailId(c.id)} style={{ ...card, gridColumn: multi ? '1 / -1' : undefined }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{ini(c.name)}</div>
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{ini(c.name)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ fontSize: 14, fontWeight: 500, color: TEXT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
@@ -511,7 +512,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
               {clients.map((c) => (
                 <button key={c.id} onClick={() => enterClientMode(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
                   <span style={{ fontSize: 13, color: TEXT, fontWeight: 500 }}>{c.name}</span>
                 </button>
               ))}
@@ -610,7 +611,7 @@ function CategoryView({ cats, links, clients }) {
                 if (!client) return null
                 return (
                   <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8 }}>
-                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{ini(client.name)}</span>
+                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: clientColor(client), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{ini(client.name)}</span>
                     <span style={{ fontSize: 13, color: TEXT, fontWeight: 500, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</span>
                     {l.practice && <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>{l.practice}</span>}
                     <button onClick={() => window.open(l.url, '_blank')} style={miniBtn}>Open →</button>
@@ -662,7 +663,41 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onSaveAbbr, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast, clientMode, clientModeName, onExitClientMode, cmSince, hiddenSections }) {
+// The client's identity color: pick from the palette or fall back to the
+// automatic name-derived one. Reflected on avatars app-wide + Client Pulse rows.
+function ClientColorPicker({ c, onSetColor }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  const current = clientColor(c)
+  const custom = !!c.info?.color
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen((o) => !o)} title="Set this client's color" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 8px 0 6px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <span style={{ width: 18, height: 18, borderRadius: '50%', background: current, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)' }} />
+        <span style={{ fontSize: 9, color: MUTED }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: '#fff', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12, width: 182, zIndex: 2000 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 8 }}>
+            {CLIENT_PALETTE.map((hex) => {
+              const on = current.toLowerCase() === hex.toLowerCase()
+              return <button key={hex} onClick={() => { onSetColor(c.id, hex); setOpen(false) }} title={hex} style={{ width: 22, height: 22, borderRadius: '50%', background: hex, border: on ? '2px solid ' + TEXT : '0.5px solid rgba(0,0,0,0.12)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' }} />
+            })}
+          </div>
+          <button onClick={() => { onSetColor(c.id, null); setOpen(false) }} style={{ marginTop: 10, width: '100%', padding: '6px 0', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 7, background: custom ? '#fff' : '#f2f4f8', color: custom ? TEXT : NAVY, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>{custom ? 'Reset to automatic' : 'Automatic (from name)'}</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onSaveAbbr, onSetColor, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast, clientMode, clientModeName, onExitClientMode, cmSince, hiddenSections }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
@@ -700,7 +735,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
       )} />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 48, height: 48, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>{ini(c.name)}</div>
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>{ini(c.name)}</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</span></div>
             <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>{c.email || info.email || ''}</div>
@@ -710,6 +745,9 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Short name</span>
           <input defaultValue={c.info?.abbr || ''} onBlur={(e) => onSaveAbbr(c.id, e.target.value)} placeholder={abbrOf({ name: c.name })} maxLength={8} style={{ width: 110, height: 30, padding: '0 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, color: TEXT, background: BG, fontFamily: 'inherit' }} />
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
+          <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.1)' }} />
+          <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Color</span>
+          <ClientColorPicker c={c} onSetColor={onSetColor} />
           <button onClick={() => document.getElementById('files-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginLeft: 'auto', height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: 'rgba(11,29,94,0.05)', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>View Files ↓</button>
         </div>
         {showSec('contact') && (
