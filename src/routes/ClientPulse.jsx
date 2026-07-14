@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
@@ -28,6 +29,11 @@ export default function ClientPulse() {
   const [snaps] = useState(loadSnaps)
   const [sel, setSel] = useState(null)
   const [filter, setFilter] = useState('consulting')
+  const [searchParams] = useSearchParams()
+  // Two roles until logins land: the assistant (full control) and the
+  // consultant (read + check off + comment). The dashboard link opens
+  // ?mode=consultant; the toggle lets you switch for now.
+  const [mode, setMode] = useState(searchParams.get('mode') === 'consultant' ? 'consultant' : 'assistant')
 
   useEffect(() => {
     ;(async () => {
@@ -62,28 +68,42 @@ export default function ClientPulse() {
       <Header sub="Client Pulse" back="/" />
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 20px 60px' }}>
         {selClient ? (
-          <Individual c={selClient} onBack={() => setSel(null)} openTasks={openTasks(selClient.id)} healthPct={clientHealth(selClient.id)}
+          <Individual c={selClient} mode={mode} onBack={() => setSel(null)} openTasks={openTasks(selClient.id)} healthPct={clientHealth(selClient.id)}
             patchClient={patchClient} addItem={addItem} updateItem={updateItem} removeItem={removeItem} />
         ) : (
           <Overview groups={PRIOS.map(([key, label, color]) => ({ key, label, color, items: shown.filter((c) => (c.info?.priority || 'medium') === key) }))}
-            filter={filter} setFilter={setFilter} onOpen={setSel} openTasks={openTasks} clientHealth={clientHealth} reviewOpen={reviewOpen} fyiOpen={fyiOpen} />
+            mode={mode} setMode={setMode} clients={shown} filter={filter} setFilter={setFilter} onOpen={setSel} openTasks={openTasks} clientHealth={clientHealth} reviewOpen={reviewOpen} fyiOpen={fyiOpen} updateItem={updateItem} />
         )}
       </div>
     </div>
   )
 }
 
-function Overview({ groups, filter, setFilter, onOpen, openTasks, clientHealth, reviewOpen, fyiOpen }) {
+function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, openTasks, clientHealth, reviewOpen, fyiOpen, updateItem }) {
   const [view, setView] = useState('expanded')
   const total = groups.reduce((a, g) => a + g.items.length, 0)
+  // Comments the consultant left that the assistant hasn't seen yet.
+  const notes = []
+  if (mode === 'assistant') {
+    clients.forEach((c) => {
+      ['reviewItems', 'headsUp'].forEach((key) => (c.info?.[key] || []).forEach((it) => {
+        if (it.commentUnread) notes.push({ clientId: c.id, clientName: c.name, key, it })
+      }))
+    })
+  }
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 600, color: TEXT, margin: 0 }}>Client Pulse</h1>
-          <p style={{ fontSize: 13, color: MUTED, marginTop: 3, maxWidth: 460, lineHeight: 1.5 }}>What needs you across your clients — the docs to review and the heads-up your assistant leaves, all in one place.</p>
+          <p style={{ fontSize: 13, color: MUTED, marginTop: 3, maxWidth: 460, lineHeight: 1.5 }}>{mode === 'consultant' ? 'What needs your review across your clients — check items off and leave a comment for your assistant.' : 'What needs you across your clients — the docs to review and the heads-up your assistant leaves, all in one place.'}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+            {[['assistant', 'Assistant'], ['consultant', 'Consultant']].map(([v, l]) => (
+              <button key={v} onClick={() => setMode(v)} style={{ padding: '5px 12px', borderRadius: 999, border: 'none', background: mode === v ? '#fff' : 'transparent', color: mode === v ? NAVY : MUTED, fontSize: 12, fontWeight: mode === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: mode === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{l}</button>
+            ))}
+          </div>
           <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
             {[['expanded', 'Expanded'], ['compact', 'Compact']].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: '5px 12px', borderRadius: 999, border: 'none', background: view === v ? '#fff' : 'transparent', color: view === v ? NAVY : MUTED, fontSize: 12, fontWeight: view === v ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>{l}</button>
@@ -96,6 +116,23 @@ function Overview({ groups, filter, setFilter, onOpen, openTasks, clientHealth, 
           </div>
         </div>
       </div>
+      {mode === 'assistant' && notes.length > 0 && (
+        <div style={{ background: '#fff', border: '1.5px solid ' + NAVY, borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, marginBottom: 10 }}>New comments from the consultant ({notes.length})</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {notes.map((n) => (
+              <div key={n.clientId + n.it.id} onClick={() => { updateItem(n.clientId, n.key, n.it.id, { commentUnread: false }); onOpen(n.clientId) }} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(11,29,94,0.04)', borderRadius: 8, padding: '9px 12px', cursor: 'pointer' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: NAVY, flexShrink: 0, marginTop: 5 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: TEXT }}><strong style={{ fontWeight: 600 }}>{n.clientName}</strong> — {n.it.title}</div>
+                  <div style={{ fontSize: 12, color: NAVY, marginTop: 2 }}>↳ {n.it.reply}</div>
+                </div>
+                <span style={{ color: '#c0c6d8', fontSize: 15 }}>›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {total === 0 && <div style={{ textAlign: 'center', color: MUTED, padding: 50, fontStyle: 'italic' }}>No clients here yet.</div>}
       {groups.map((g) => g.items.length > 0 && (
         <div key={g.key} style={{ marginBottom: 18 }}>
@@ -179,13 +216,25 @@ function ExpandedCard({ c, color, onOpen, ot, h }) {
   )
 }
 
-function Individual({ c, onBack, openTasks, healthPct, patchClient, addItem, updateItem, removeItem }) {
+function Individual({ c, mode, onBack, openTasks, healthPct, patchClient, addItem, updateItem, removeItem }) {
   const info = c.info || {}
+  const canEdit = mode === 'assistant'
   const priority = info.priority || 'medium'
   const status = info.status || ''
   const review = info.reviewItems || []
   const heads = info.headsUp || []
   const notes = [...(info.notesLog || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  // Opening a client in assistant mode clears its "new comment" flags.
+  useEffect(() => {
+    if (mode !== 'assistant') return
+    const clear = (arr) => (arr || []).map((i) => (i.commentUnread ? { ...i, commentUnread: false } : i))
+    if ((info.reviewItems || []).some((i) => i.commentUnread) || (info.headsUp || []).some((i) => i.commentUnread)) {
+      patchClient(c.id, { reviewItems: clear(info.reviewItems), headsUp: clear(info.headsUp) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [c.id, mode])
+  // The consultant's comment notifies the assistant (marks it unread for them).
+  const onReply = (key, itemId, v) => updateItem(c.id, key, itemId, mode === 'consultant' ? { reply: v, commentUnread: true } : { reply: v })
   // Checking an item off logs it to the client notes (so the profile has the
   // full record), the first time it's completed.
   const toggleItem = (key, it, doneKey) => {
@@ -213,28 +262,30 @@ function Individual({ c, onBack, openTasks, healthPct, patchClient, addItem, upd
       <div style={{ display: 'flex', gap: 24, marginBottom: 22, flexWrap: 'wrap' }}>
         <div>
           <div style={fieldLabel}>Priority</div>
-          <Segmented options={PRIOS.map((p) => [p[0], p[1]])} value={priority} colorMap={PRIO_COLOR} onChange={(v) => patchClient(c.id, { priority: v })} />
+          {canEdit ? <Segmented options={PRIOS.map((p) => [p[0], p[1]])} value={priority} colorMap={PRIO_COLOR} onChange={(v) => patchClient(c.id, { priority: v })} />
+            : <span style={{ fontSize: 13, fontWeight: 500, color: PRIO_COLOR[priority] }}>{(PRIOS.find((p) => p[0] === priority) || [])[1]}</span>}
         </div>
         <div>
           <div style={fieldLabel}>Status</div>
-          <Segmented options={STATUSES.map((s) => [s[0], s[1]])} value={status} onChange={(v) => patchClient(c.id, { status: v })} />
+          {canEdit ? <Segmented options={STATUSES.map((s) => [s[0], s[1]])} value={status} onChange={(v) => patchClient(c.id, { status: v })} />
+            : (() => { const s = STATUSES.find((x) => x[0] === status); return s ? <span style={{ fontSize: 12, color: s[2], background: s[3], borderRadius: 999, padding: '3px 11px' }}>{s[1]}</span> : <span style={{ fontSize: 13, color: MUTED }}>—</span> })()}
         </div>
       </div>
 
       <Section title="To review" count={review.filter((i) => !i.done).length}>
         {review.length === 0 && <Empty>Nothing to review right now.</Empty>}
-        {review.map((it) => <ItemRow key={it.id} it={it} doneKey="done" hasLink onToggle={() => toggleItem('reviewItems', it, 'done')} onReply={(v) => updateItem(c.id, 'reviewItems', it.id, { reply: v })} onRemove={() => removeItem(c.id, 'reviewItems', it.id)} />)}
-        <ItemComposer hasLink onAdd={(o) => addItem(c.id, 'reviewItems', { id: uid(), done: false, reply: '', createdAt: new Date().toISOString(), ...o })} />
+        {review.map((it) => <ItemRow key={it.id} it={it} doneKey="done" hasLink canEdit={canEdit} onToggle={() => toggleItem('reviewItems', it, 'done')} onReply={(v) => onReply('reviewItems', it.id, v)} onRemove={() => removeItem(c.id, 'reviewItems', it.id)} />)}
+        {canEdit && <ItemComposer hasLink onAdd={(o) => addItem(c.id, 'reviewItems', { id: uid(), done: false, reply: '', createdAt: new Date().toISOString(), ...o })} />}
       </Section>
 
       <Section title="Heads up" count={heads.filter((i) => !i.seen).length}>
         {heads.length === 0 && <Empty>No heads-up items.</Empty>}
-        {heads.map((it) => <ItemRow key={it.id} it={it} doneKey="seen" onToggle={() => toggleItem('headsUp', it, 'seen')} onReply={(v) => updateItem(c.id, 'headsUp', it.id, { reply: v })} onRemove={() => removeItem(c.id, 'headsUp', it.id)} />)}
-        <ItemComposer onAdd={(o) => addItem(c.id, 'headsUp', { id: uid(), seen: false, reply: '', createdAt: new Date().toISOString(), ...o })} />
+        {heads.map((it) => <ItemRow key={it.id} it={it} doneKey="seen" canEdit={canEdit} onToggle={() => toggleItem('headsUp', it, 'seen')} onReply={(v) => onReply('headsUp', it.id, v)} onRemove={() => removeItem(c.id, 'headsUp', it.id)} />)}
+        {canEdit && <ItemComposer onAdd={(o) => addItem(c.id, 'headsUp', { id: uid(), seen: false, reply: '', createdAt: new Date().toISOString(), ...o })} />}
       </Section>
 
-      <Section title="Notes" sub="Synced with the client profile">
-        <NoteAdd onAdd={(text) => addItem(c.id, 'notesLog', { id: 'n' + Date.now(), text, createdAt: new Date().toISOString(), editedAt: null, history: [] })} />
+      <Section title="Notes &amp; history" sub="Synced with the client profile">
+        {canEdit && <NoteAdd onAdd={(text) => addItem(c.id, 'notesLog', { id: 'n' + Date.now(), text, createdAt: new Date().toISOString(), editedAt: null, history: [] })} />}
         {notes.length === 0 && <Empty>No notes yet.</Empty>}
         {notes.map((n, idx) => {
           const lines = (n.text || '').split('\n'); const title = lines[0]; const body = lines.slice(1).join('\n').replace(/^\n+|\n+$/g, '')
@@ -250,7 +301,7 @@ function Individual({ c, onBack, openTasks, healthPct, patchClient, addItem, upd
   )
 }
 
-function ItemRow({ it, doneKey, hasLink, onToggle, onReply, onRemove }) {
+function ItemRow({ it, doneKey, hasLink, canEdit, onToggle, onReply, onRemove }) {
   const done = it[doneKey]
   return (
     <div style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '11px 13px', marginTop: 8 }}>
@@ -262,9 +313,10 @@ function ItemRow({ it, doneKey, hasLink, onToggle, onReply, onRemove }) {
               ? <a href={it.url} target="_blank" rel="noopener" style={{ fontSize: 14, color: NAVY, fontWeight: 500, textDecoration: done ? 'line-through' : 'none' }}>{it.title} ↗</a>
               : <span style={{ fontSize: 14, color: TEXT, textDecoration: done ? 'line-through' : 'none' }}>{it.title}</span>}
             {it.kind && <span style={{ fontSize: 10, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 4, padding: '0 6px' }}>{it.kind}</span>}
-            <button onClick={onRemove} title="Remove" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>
+            {canEdit && <button onClick={onRemove} title="Remove" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>}
           </div>
           {it.note && <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginTop: 4 }}><span style={{ color: '#a0a09e' }}>assistant:</span> {it.note}</div>}
+          {!hasLink && it.url && <a href={it.url} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: NAVY, fontWeight: 500, marginTop: 6, textDecoration: 'none' }}>View email thread ↗</a>}
           <ReplyBox value={it.reply} onSave={onReply} />
         </div>
       </div>
@@ -288,7 +340,7 @@ function ItemComposer({ hasLink, onAdd }) {
   return (
     <div style={{ marginTop: 10, border: '0.5px dashed rgba(0,0,0,0.25)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder={hasLink ? 'What is it? (e.g. New consult script)' : 'What happened? (e.g. Owner emailed about close rate)'} style={inp} />
-      {hasLink && <input value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="Link — Google Drive, Doc, sheet… (optional)" style={inp} />}
+      <input value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder={hasLink ? 'Link — Google Drive, Doc, sheet… (optional)' : 'Link to the email thread (optional)'} style={inp} />
       {hasLink && <input value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })} placeholder="Type — PDF, Doc, Sheet… (optional)" style={inp} />}
       <textarea value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="Note — what this is / what to do with it" style={{ ...inp, minHeight: 48, resize: 'vertical' }} />
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
