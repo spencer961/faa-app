@@ -29,6 +29,7 @@ export default function Header({ sub, back, right, hideMenu }) {
 const NAV = [
   { to: '/', label: 'Home' },
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/pulse', label: 'Client Pulse' },
   { to: '/success-map', label: 'Success Map' },
   { to: '/metrics', label: 'Metrics Tracker' },
   { to: '/tasks', label: 'To-Do Lists' },

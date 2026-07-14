@@ -48,7 +48,8 @@
       "Bash(git commit -q -m 'Success Map scoring: narrow left section ~20%, widen scoring panel to fill *)",
       "Bash(git commit -q -m 'Success Map scoring: dial left-column shrink from 20% to 10% *)",
       "Bash(git commit -q -m 'Success Map scoring: right margin to 25% \\(+5%\\), shrink scoring column *)",
-      "Bash(git commit -q -m 'Success Map form review: match the scoring-view two-column layout *)"
+      "Bash(git commit -q -m 'Success Map form review: match the scoring-view two-column layout *)",
+      "Bash(git commit -q -m 'Add Client Pulse — a shared client review desk *)"
     ]
   }
 }
