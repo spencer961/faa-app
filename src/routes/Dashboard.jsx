@@ -476,11 +476,13 @@ export default function Dashboard() {
                   </div>
                   {editMode && <button onClick={(e) => { e.stopPropagation(); setLinkModal({ clientId: c.id, practice: activePrac || '' }) }} style={addRow}>+ Add link</button>}
                 </div>
+                {/* Tier badges hidden on the cards for now — tiers are still set on the
+                    client profile. To bring them back, restore this block:
                 {getTiers(c).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 12, paddingTop: 10, borderTop: '0.5px solid rgba(0,0,0,0.06)' }}>
                     {getTiers(c).map((id) => { const t = tiers.find((x) => x.id === id); if (!t) return null; return <TierDot key={id} name={t.name} color={t.color} /> })}
                   </div>
-                )}
+                )} */}
                 {ct.accounting && !clientMode && (() => {
                   const billing = c.info?.billing || c.billing || {}
                   const payments = Array.isArray(c.info?.payments) ? c.info.payments : []
