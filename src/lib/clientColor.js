@@ -5,10 +5,13 @@
 // app — avatars and the Client Pulse row accents.
 // ─────────────────────────────────────────────────────────────────────
 
+// Google Calendar's color palette — reds/oranges/yellows, then greens/teals/
+// blues, then purples/brown/grey. Used both for the auto-assigned defaults and
+// as the swatches in the profile color picker.
 export const CLIENT_PALETTE = [
-  '#0b1d5e', '#1a7fd4', '#18a866', '#bc9762', '#d4537e',
-  '#7f77dd', '#e07b0a', '#0f6e56', '#993c1d', '#0891b2',
-  '#9333ea', '#b45309',
+  '#AD1457', '#D81B60', '#E67C73', '#D50000', '#F4511E', '#EF6C00', '#F09300', '#F6BF26',
+  '#E4C441', '#C0CA33', '#7CB342', '#33691E', '#0B8043', '#009688', '#039BE5', '#4285F4',
+  '#7986CB', '#3F51B5', '#B39DDB', '#8E24AA', '#9C27B0', '#795548', '#616161', '#A79B8E',
 ]
 
 export const clientColor = (c) => {

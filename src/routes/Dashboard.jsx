@@ -663,11 +663,13 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-// The client's identity color: pick from the palette or fall back to the
-// automatic name-derived one. Reflected on avatars app-wide + Client Pulse rows.
-function ClientColorPicker({ c, onSetColor }) {
+// The client's identity color, chosen right on their avatar. Google Calendar-
+// style palette + a custom color option; "Default" falls back to the automatic
+// name-derived color. Reflected on avatars app-wide + Client Pulse rows.
+function AvatarColorPicker({ c, onSetColor }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const customRef = useRef(null)
   useEffect(() => {
     if (!open) return
     const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -676,21 +678,32 @@ function ClientColorPicker({ c, onSetColor }) {
   }, [open])
   const current = clientColor(c)
   const custom = !!c.info?.color
+  const isCustomHex = custom && !CLIENT_PALETTE.some((h) => h.toLowerCase() === current.toLowerCase())
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button onClick={() => setOpen((o) => !o)} title="Set this client's color" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 8px 0 6px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <span style={{ width: 18, height: 18, borderRadius: '50%', background: current, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)' }} />
-        <span style={{ fontSize: 9, color: MUTED }}>▾</span>
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button onClick={() => setOpen((o) => !o)} title="Change color" style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', background: current, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+        {ini(c.name)}
+        <span style={{ position: 'absolute', right: -1, bottom: -1, width: 17, height: 17, borderRadius: '50%', background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+        </span>
       </button>
       {open && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: '#fff', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12, width: 182, zIndex: 2000 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 8 }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, background: '#fff', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 10px 30px rgba(0,0,0,0.18)', padding: 14, width: 264, zIndex: 2000 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 7 }}>
             {CLIENT_PALETTE.map((hex) => {
-              const on = current.toLowerCase() === hex.toLowerCase()
-              return <button key={hex} onClick={() => { onSetColor(c.id, hex); setOpen(false) }} title={hex} style={{ width: 22, height: 22, borderRadius: '50%', background: hex, border: on ? '2px solid ' + TEXT : '0.5px solid rgba(0,0,0,0.12)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' }} />
+              const on = custom && current.toLowerCase() === hex.toLowerCase()
+              return <button key={hex} onClick={() => { onSetColor(c.id, hex); setOpen(false) }} title={hex} style={{ width: 24, height: 24, borderRadius: '50%', background: hex, border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, lineHeight: 1 }}>{on ? '✓' : ''}</button>
             })}
           </div>
-          <button onClick={() => { onSetColor(c.id, null); setOpen(false) }} style={{ marginTop: 10, width: '100%', padding: '6px 0', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 7, background: custom ? '#fff' : '#f2f4f8', color: custom ? TEXT : NAVY, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>{custom ? 'Reset to automatic' : 'Automatic (from name)'}</button>
+          <button onClick={() => customRef.current?.click()} style={{ marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 9, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'conic-gradient(#f44336,#ff9800,#ffeb3b,#4caf50,#00bcd4,#3f51b5,#9c27b0,#f44336)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12 }}>{isCustomHex ? '✓' : ''}</span>
+            <span style={{ fontSize: 13, color: TEXT }}>Custom{isCustomHex ? ' — ' + current.toUpperCase() : '…'}</span>
+            <input ref={customRef} type="color" value={isCustomHex ? current : '#4285F4'} onChange={(e) => onSetColor(c.id, e.target.value)} style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
+          </button>
+          <button onClick={() => { onSetColor(c.id, null); setOpen(false) }} style={{ marginTop: 8, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 0', border: 'none', borderRadius: 9, background: custom ? '#f1f3f4' : '#e8f0fe', color: custom ? TEXT : '#1a73e8', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid ' + (custom ? MUTED : '#1a73e8'), boxSizing: 'border-box' }} />
+            Default
+          </button>
         </div>
       )}
     </div>
@@ -735,7 +748,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
       )} />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 48, height: 48, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>{ini(c.name)}</div>
+          <AvatarColorPicker c={c} onSetColor={onSetColor} />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</span></div>
             <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>{c.email || info.email || ''}</div>
@@ -745,9 +758,6 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Short name</span>
           <input defaultValue={c.info?.abbr || ''} onBlur={(e) => onSaveAbbr(c.id, e.target.value)} placeholder={abbrOf({ name: c.name })} maxLength={8} style={{ width: 110, height: 30, padding: '0 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, color: TEXT, background: BG, fontFamily: 'inherit' }} />
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
-          <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.1)' }} />
-          <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Color</span>
-          <ClientColorPicker c={c} onSetColor={onSetColor} />
           <button onClick={() => document.getElementById('files-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginLeft: 'auto', height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: 'rgba(11,29,94,0.05)', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>View Files ↓</button>
         </div>
         {showSec('contact') && (
