@@ -1016,6 +1016,7 @@ function NotesSection({ client: c, onSave, clientMode, cmSince }) {
   const [histId, setHistId] = useState(null)
   const [confirmDelId, setConfirmDelId] = useState(null)
   const fmt = (iso) => { try { const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) } catch { return '' } }
+  const shortDate = (iso) => { try { const d = new Date(iso); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2) } catch { return '' } }
   const add = () => { const t = draft.trim(); if (!t) return; onSave(c.id, [...raw(), { id: 'n' + Date.now(), text: t, createdAt: new Date().toISOString(), editedAt: null, history: [] }]); setDraft('') }
   const saveEdit = (id) => { const t = editText.trim(); if (!t) return; onSave(c.id, raw().map((n) => (n.id === id ? { ...n, text: t, editedAt: new Date().toISOString(), history: [...(n.history || []), { text: n.text, date: n.editedAt || n.createdAt }] } : n))); setEditId(null) }
   const del = (id) => onSave(c.id, raw().filter((n) => n.id !== id))
@@ -1026,46 +1027,58 @@ function NotesSection({ client: c, onSave, clientMode, cmSince }) {
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a note…" style={{ ...inp, flex: 1, height: 40, padding: '9px 10px', resize: 'vertical' }} />
         <button onClick={add} style={btnPrimary}>Add note</button>
       </div>
-      <div style={{ maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ maxHeight: 360, overflowY: 'auto' }}>
         {notes.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic' }}>{clientMode ? 'No notes added this session yet.' : 'No notes yet.'}</div>}
-        {notes.map((n) => (
-          <div key={n.id} style={{ background: BG, borderRadius: 8, padding: '10px 12px' }}>
-            {editId === n.id ? (
-              <div>
-                <textarea value={editText} onChange={(e) => setEditText(e.target.value)} style={{ ...inp, width: '100%', height: 60, padding: '8px 10px', resize: 'vertical' }} />
-                <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
-                  <button onClick={() => setEditId(null)} style={{ ...btnGhost, height: 28 }}>Cancel</button>
-                  <button onClick={() => saveEdit(n.id)} style={{ ...btnPrimary, height: 28 }}>Save</button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.text}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, color: MUTED }}>{fmt(n.createdAt)}{n.editedAt ? ' · edited ' + fmt(n.editedAt) : ''}</span>
-                  {!clientMode && <button onClick={() => { setEditId(n.id); setEditText(n.text) }} style={noteLink}>Edit</button>}
-                  {!clientMode && n.history && n.history.length > 0 && <button onClick={() => setHistId(histId === n.id ? null : n.id)} style={noteLink}>History ({n.history.length})</button>}
-                  {!clientMode && (confirmDelId === n.id ? (
-                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: '#A32D2D' }}>Delete this note?</span>
-                      <button onClick={() => setConfirmDelId(null)} style={noteLink}>No</button>
-                      <button onClick={() => { del(n.id); setConfirmDelId(null) }} style={{ ...noteLink, color: '#A32D2D' }}>Yes</button>
-                    </span>
-                  ) : (
-                    <button onClick={() => setConfirmDelId(n.id)} style={{ ...noteLink, color: '#A32D2D' }}>Delete</button>
-                  ))}
-                </div>
-                {!clientMode && histId === n.id && (
-                  <div style={{ marginTop: 8, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {[...(n.history || [])].reverse().map((h, i) => (
-                      <div key={i}><div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>{fmt(h.date)}</div><div style={{ fontSize: 12, color: MUTED, whiteSpace: 'pre-wrap' }}>{h.text}</div></div>
-                    ))}
+        {notes.map((n, idx) => {
+          const lines = (n.text || '').split('\n')
+          const title = lines[0]
+          const body = lines.slice(1).join('\n').replace(/^\n+|\n+$/g, '')
+          return (
+            <div key={n.id} style={{ padding: '8px 0', borderTop: idx > 0 ? '0.5px solid rgba(0,0,0,0.07)' : 'none' }}>
+              {editId === n.id ? (
+                <div>
+                  <textarea value={editText} onChange={(e) => setEditText(e.target.value)} style={{ ...inp, width: '100%', height: 70, padding: '8px 10px', resize: 'vertical' }} />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                    <button onClick={() => setEditId(null)} style={{ ...btnGhost, height: 28 }}>Cancel</button>
+                    <button onClick={() => saveEdit(n.id)} style={{ ...btnPrimary, height: 28 }}>Save</button>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        ))}
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.4 }}><span style={{ color: GOLD }}>{shortDate(n.createdAt)}</span>&nbsp; {title}</span>
+                    {!clientMode && (
+                      <span className="note-actions" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                        {confirmDelId === n.id ? (
+                          <>
+                            <span style={{ fontSize: 11, color: '#A32D2D' }}>Delete?</span>
+                            <button onClick={() => setConfirmDelId(null)} style={noteLink}>No</button>
+                            <button onClick={() => { del(n.id); setConfirmDelId(null) }} style={{ ...noteLink, color: '#A32D2D' }}>Yes</button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => { setEditId(n.id); setEditText(n.text) }} style={noteLink}>Edit</button>
+                            {n.history && n.history.length > 0 && <button onClick={() => setHistId(histId === n.id ? null : n.id)} style={noteLink}>History ({n.history.length})</button>}
+                            <button onClick={() => setConfirmDelId(n.id)} style={{ ...noteLink, color: '#A32D2D' }}>Delete</button>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {body && <div style={{ fontSize: 13, color: '#44443f', lineHeight: 1.55, whiteSpace: 'pre-wrap', marginTop: 2 }}>{body}</div>}
+                  {n.editedAt && <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>edited {shortDate(n.editedAt)}</div>}
+                  {!clientMode && histId === n.id && (
+                    <div style={{ marginTop: 8, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[...(n.history || [])].reverse().map((h, i) => (
+                        <div key={i}><div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>{shortDate(h.date)}</div><div style={{ fontSize: 12, color: MUTED, whiteSpace: 'pre-wrap' }}>{h.text}</div></div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

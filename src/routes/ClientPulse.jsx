@@ -20,6 +20,7 @@ const uid = () => 'i' + Date.now().toString(36) + Math.random().toString(36).sli
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
 const loadSnaps = () => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } }
 const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) } catch { return '' } }
+const sd = (iso) => { try { const d = new Date(iso); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2) } catch { return '' } }
 
 export default function ClientPulse() {
   const [clients, setClients] = useState([])
@@ -235,12 +236,15 @@ function Individual({ c, onBack, openTasks, healthPct, patchClient, addItem, upd
       <Section title="Notes" sub="Synced with the client profile">
         <NoteAdd onAdd={(text) => addItem(c.id, 'notesLog', { id: 'n' + Date.now(), text, createdAt: new Date().toISOString(), editedAt: null, history: [] })} />
         {notes.length === 0 && <Empty>No notes yet.</Empty>}
-        {notes.map((n) => (
-          <div key={n.id} style={{ background: BG, borderRadius: 8, padding: '10px 12px', marginTop: 8 }}>
-            <div style={{ fontSize: 13, color: TEXT, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{n.text}</div>
-            <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>{fmtDate(n.createdAt)}</div>
-          </div>
-        ))}
+        {notes.map((n, idx) => {
+          const lines = (n.text || '').split('\n'); const title = lines[0]; const body = lines.slice(1).join('\n').replace(/^\n+|\n+$/g, '')
+          return (
+            <div key={n.id} style={{ padding: '8px 0', borderTop: idx > 0 ? '0.5px solid rgba(0,0,0,0.07)' : 'none' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.4 }}><span style={{ color: GOLD }}>{sd(n.createdAt)}</span>&nbsp; {title}</div>
+              {body && <div style={{ fontSize: 13, color: '#44443f', lineHeight: 1.55, whiteSpace: 'pre-wrap', marginTop: 2 }}>{body}</div>}
+            </div>
+          )
+        })}
       </Section>
     </>
   )
