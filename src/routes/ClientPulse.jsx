@@ -5,7 +5,6 @@ import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
 import { health as calcHealth } from '../lib/successMap.js'
 import { getClientTiers } from '../lib/tiers.js'
-import { clientColor } from '../lib/clientColor.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Client Pulse — a shared review desk between you and your assistant.
@@ -137,10 +136,8 @@ function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, o
               {g.items.map((c, i) => {
                 const st = STATUSES.find((s) => s[0] === c.info?.status)
                 const rO = reviewOpen(c), fO = fyiOpen(c), h = clientHealth(c.id), ot = openTasks(c.id)
-                const cc = clientColor(c)
                 return (
-                  <div key={c.id} onClick={() => onOpen(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderLeft: '4px solid ' + cc, borderBottom: i < g.items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', cursor: 'pointer' }}>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: cc, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 11, flexShrink: 0 }}>{ini(c.name)}</div>
+                  <div key={c.id} onClick={() => onOpen(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderLeft: '3px solid ' + g.color, borderBottom: i < g.items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', cursor: 'pointer' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 14, fontWeight: 500, color: TEXT }}>{c.name}</span>
@@ -161,7 +158,7 @@ function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, o
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 10 }}>
-              {g.items.map((c) => <ExpandedCard key={c.id} c={c} color={clientColor(c)} onOpen={onOpen} ot={openTasks(c.id)} h={clientHealth(c.id)} />)}
+              {g.items.map((c) => <ExpandedCard key={c.id} c={c} color={g.color} onOpen={onOpen} ot={openTasks(c.id)} h={clientHealth(c.id)} />)}
             </div>
           )}
         </div>
@@ -184,7 +181,6 @@ function ExpandedCard({ c, color, onOpen, ot, h }) {
   return (
     <div onClick={() => onOpen(c.id)} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '3px solid ' + color, borderRadius: 10, padding: '13px 15px', cursor: 'pointer' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: (rev.length || fyi.length) ? 10 : 0 }}>
-        <span style={{ width: 26, height: 26, borderRadius: '50%', background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 10, flexShrink: 0 }}>{ini(c.name)}</span>
         <span style={{ fontSize: 15, fontWeight: 500, color: TEXT }}>{c.name}</span>
         {st && <span style={{ fontSize: 11, color: st[2], background: st[3], borderRadius: 999, padding: '1px 9px' }}>{st[1]}</span>}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>
@@ -247,7 +243,7 @@ function Individual({ c, mode, onBack, openTasks, healthPct, patchClient, addIte
     <>
       <button onClick={onBack} style={{ ...linkBtn, marginBottom: 14 }}>← Back to board</button>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, flexShrink: 0 }}>{ini(c.name)}</div>
+        <div style={{ width: 44, height: 44, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, flexShrink: 0 }}>{ini(c.name)}</div>
         <div style={{ flex: 1, minWidth: 180 }}>
           <div style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</div>
           <div style={{ fontSize: 12, color: MUTED }}>{openTasks} open to-dos{healthPct !== null ? ' · ' + healthPct + '% health' : ''}</div>

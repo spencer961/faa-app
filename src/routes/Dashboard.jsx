@@ -396,7 +396,7 @@ export default function Dashboard() {
             return (
               <div key={c.id} onClick={() => setDetailId(c.id)} style={{ ...card, gridColumn: multi ? '1 / -1' : undefined }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{ini(c.name)}</div>
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{ini(c.name)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ fontSize: 14, fontWeight: 500, color: TEXT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
@@ -512,7 +512,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
               {clients.map((c) => (
                 <button key={c.id} onClick={() => enterClientMode(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: clientColor(c), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
                   <span style={{ fontSize: 13, color: TEXT, fontWeight: 500 }}>{c.name}</span>
                 </button>
               ))}
@@ -611,7 +611,7 @@ function CategoryView({ cats, links, clients }) {
                 if (!client) return null
                 return (
                   <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8 }}>
-                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: clientColor(client), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{ini(client.name)}</span>
+                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{ini(client.name)}</span>
                     <span style={{ fontSize: 13, color: TEXT, fontWeight: 500, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</span>
                     {l.practice && <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>{l.practice}</span>}
                     <button onClick={() => window.open(l.url, '_blank')} style={miniBtn}>Open →</button>
@@ -663,10 +663,10 @@ function LinkChip({ l, editMode, onEdit, onDelete, clientName }) {
   )
 }
 
-// The client's identity color, chosen right on their avatar. Google Calendar-
-// style palette + a custom color option; "Default" falls back to the automatic
-// name-derived color. Reflected on avatars app-wide + Client Pulse rows.
-function AvatarColorPicker({ c, onSetColor }) {
+// The client's identity color. Installed for future use — not shown on
+// avatars right now, just assignable here. Google Calendar-style palette + a
+// custom color option; "Default" falls back to the automatic name-derived color.
+function ClientColorPicker({ c, onSetColor }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const customRef = useRef(null)
@@ -681,14 +681,12 @@ function AvatarColorPicker({ c, onSetColor }) {
   const isCustomHex = custom && !CLIENT_PALETTE.some((h) => h.toLowerCase() === current.toLowerCase())
   return (
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
-      <button onClick={() => setOpen((o) => !o)} title="Change color" style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', background: current, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-        {ini(c.name)}
-        <span style={{ position: 'absolute', right: -1, bottom: -1, width: 17, height: 17, borderRadius: '50%', background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-        </span>
+      <button onClick={() => setOpen((o) => !o)} title="Set this client's color" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 8px 0 6px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <span style={{ width: 18, height: 18, borderRadius: '50%', background: current, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)' }} />
+        <span style={{ fontSize: 9, color: MUTED }}>▾</span>
       </button>
       {open && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, background: '#fff', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 10px 30px rgba(0,0,0,0.18)', padding: 14, width: 264, zIndex: 2000 }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: '#fff', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 10px 30px rgba(0,0,0,0.18)', padding: 14, width: 264, zIndex: 2000 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 7 }}>
             {CLIENT_PALETTE.map((hex) => {
               const on = custom && current.toLowerCase() === hex.toLowerCase()
@@ -748,7 +746,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
       )} />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-          <AvatarColorPicker c={c} onSetColor={onSetColor} />
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>{ini(c.name)}</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{c.name}</span></div>
             <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>{c.email || info.email || ''}</div>
@@ -758,6 +756,9 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Short name</span>
           <input defaultValue={c.info?.abbr || ''} onBlur={(e) => onSaveAbbr(c.id, e.target.value)} placeholder={abbrOf({ name: c.name })} maxLength={8} style={{ width: 110, height: 30, padding: '0 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, color: TEXT, background: BG, fontFamily: 'inherit' }} />
           <span style={{ fontSize: 11, color: MUTED }}>shown in the abbreviated filter view</span>
+          <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.1)' }} />
+          <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Color</span>
+          <ClientColorPicker c={c} onSetColor={onSetColor} />
           <button onClick={() => document.getElementById('files-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginLeft: 'auto', height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: 'rgba(11,29,94,0.05)', color: NAVY, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>View Files ↓</button>
         </div>
         {showSec('contact') && (
