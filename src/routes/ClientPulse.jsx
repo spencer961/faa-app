@@ -5,6 +5,7 @@ import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
 import { health as calcHealth } from '../lib/successMap.js'
 import { getClientTiers } from '../lib/tiers.js'
+import { isArchived } from '../lib/archive.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Client Pulse — a shared review desk between you and your assistant.
@@ -60,7 +61,7 @@ export default function ClientPulse() {
   const fyiOpen = (c) => (c.info?.headsUp || []).filter((i) => !i.seen).length
 
   const isConsulting = (c) => { const t = getClientTiers(c); return t.length === 0 || t.includes('consulting') }
-  const shown = clients.filter((c) => filter === 'all' || isConsulting(c))
+  const shown = clients.filter((c) => !isArchived(c) && (filter === 'all' || isConsulting(c)))
   const selClient = sel != null ? clients.find((c) => c.id === sel) : null
 
   return (

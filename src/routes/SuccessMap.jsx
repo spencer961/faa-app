@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase.js'
 import { CATS, SC, CYCLE, leafIds, pScore, health, initScores } from '../lib/successMap.js'
 import { DSEC } from '../lib/onboardingSections.js'
 import { getClientMode } from '../lib/clientMode.js'
+import { isArchived } from '../lib/archive.js'
 
 // Success Map — migrated from portal.html. Consultant scores each client
 // red/yellow/green across categories; health % = share of green items.
@@ -63,24 +64,36 @@ export default function SuccessMap() {
 
 // ── HOME ────────────────────────────────────────────────────────────────
 function HomeView({ clients, snaps, onOpen, onForm, onAssess }) {
+  // Archived clients are hidden by default; opt in to compare them alongside.
+  const [includeArchived, setIncludeArchived] = useState(false)
+  const archivedCount = clients.filter(isArchived).length
+  const visible = includeArchived ? clients : clients.filter((c) => !isArchived(c))
   const latestH = (id) => { const s = (snaps[id] || []); return s.length ? health(s[s.length - 1].scores) : null }
-  const scored = clients.filter((c) => latestH(c.id) !== null)
+  const scored = visible.filter((c) => latestH(c.id) !== null)
   const avg = scored.length ? Math.round(scored.reduce((a, c) => a + latestH(c.id), 0) / scored.length) : 0
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Success Map — Consultant view" back="/" />
       <div style={{ maxWidth: 1060, margin: '0 auto', padding: '28px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
-          {[['Total Clients', clients.length, NAVY], ['Assessed', scored.length, '#22c55e'], ['Avg Health', avg + '%', '#3b82f6']].map(([l, n, c]) => (
+          {[['Total Clients', visible.length, NAVY], ['Assessed', scored.length, '#22c55e'], ['Avg Health', avg + '%', '#3b82f6']].map(([l, n, c]) => (
             <div key={l} style={{ ...CARD, padding: '16px 20px' }}>
               <div style={{ fontSize: 26, fontWeight: 700, color: c, lineHeight: 1, marginBottom: 3 }}>{n}</div>
               <div style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{l}</div>
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 14 }}>Clients</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>Clients</div>
+          {archivedCount > 0 && (
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: MUTED, cursor: 'pointer' }}>
+              <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} style={{ cursor: 'pointer' }} />
+              Include archived ({archivedCount}) — for comparison
+            </label>
+          )}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
-          {clients.map((c) => {
+          {visible.map((c) => {
             const s = clientSnapsSorted(snaps[c.id])
             const lat = s[s.length - 1], fst = s[0]
             const latH = lat ? health(lat.scores) : 0
@@ -110,7 +123,7 @@ function HomeView({ clients, snaps, onOpen, onForm, onAssess }) {
               </div>
             )
           })}
-          {!clients.length && <div style={{ ...CARD, textAlign: 'center', padding: '40px 24px', gridColumn: '1/-1', color: MUTED, fontSize: 14 }}>Loading clients…</div>}
+          {!visible.length && <div style={{ ...CARD, textAlign: 'center', padding: '40px 24px', gridColumn: '1/-1', color: MUTED, fontSize: 14 }}>{clients.length ? 'No active clients.' : 'Loading clients…'}</div>}
         </div>
       </div>
     </div>

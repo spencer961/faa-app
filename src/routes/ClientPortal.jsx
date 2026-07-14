@@ -8,6 +8,7 @@ import { health, leafIds, CATS } from '../lib/successMap.js'
 import { getClientMode } from '../lib/clientMode.js'
 import { DEFAULT_TIERS, getClientTiers, MODULES, DEFAULT_TIER_ACCESS, accessForClient } from '../lib/tiers.js'
 import { isAdmin } from '../lib/auth.js'
+import { isArchived } from '../lib/archive.js'
 
 // Client Portal — the client's-eye view. As admin you pick a client and
 // preview their portal; later, logins drop each client straight onto
@@ -83,7 +84,7 @@ export default function ClientPortal() {
           )}
           {!clients.length && <div style={{ color: MUTED, fontStyle: 'italic' }}>Loading clients…</div>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 14 }}>
-            {clients.filter((c) => tierFilter === 'all' || getClientTiers(c).includes(tierFilter)).map((c) => {
+            {clients.filter((c) => !isArchived(c) && (tierFilter === 'all' || getClientTiers(c).includes(tierFilter))).map((c) => {
               const hp = latestHealth(c.id)
               const ct = getClientTiers(c)
               return (

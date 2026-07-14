@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getClientMode } from '../lib/clientMode.js'
+import { isArchived } from '../lib/archive.js'
 
 // Task manager — migrated from todo.html. Personal + per-client tasks,
 // grouped by status / priority / all. Reads clients & tasks from Supabase.
@@ -122,7 +123,7 @@ export default function Tasks() {
             </>
           )}
           <div className="sb-section" style={{ marginTop: 4 }}>Clients</div>
-          {(cm ? clients.filter((c) => c.id === cm) : clients).map((c, i) => (
+          {(cm ? clients.filter((c) => c.id === cm) : clients.filter((c) => !isArchived(c))).map((c, i) => (
             <div key={c.id} className={'sb-item' + (selId === c.id ? ' active' : '')} onClick={() => setSelId(c.id)}>
               <span className="sb-dot" style={{ background: accent(c, i) }} />
               <span className="sb-name">{c.name}</span>
@@ -235,7 +236,7 @@ function TaskModal({ task, clients, onClose, onSave, onDelete }) {
         <div className="fg"><div className="fl">Client</div>
           <select className="fi" value={form.client_id || ''} onChange={(e) => set('client_id', e.target.value || null)}>
             <option value="">— My Tasks (personal) —</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {clients.filter((c) => !isArchived(c)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Leave blank for personal tasks</div>
         </div>

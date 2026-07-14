@@ -8,6 +8,7 @@ import { health } from '../lib/successMap.js'
 import { DEFAULT_TIERS, TIER_PALETTE, getClientTiers as getTiers } from '../lib/tiers.js'
 import { DSEC } from '../lib/onboardingSections.js'
 import { clientColor, CLIENT_PALETTE } from '../lib/clientColor.js'
+import { isArchived } from '../lib/archive.js'
 
 // Command center — migrated from dashboard.html (Pass 1: client directory,
 // quick-launch links/files, and client info detail view).
@@ -116,6 +117,7 @@ export default function Dashboard() {
   const [selectModal, setSelectModal] = useState(false)
   const [endModal, setEndModal] = useState(false)
   const [addClientModal, setAddClientModal] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
   const [metricsByClient, setMetricsByClient] = useState({})
   const [snaps] = useState(() => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } })
   const [toggles, setToggles] = useState(() => { try { return { todos: true, progress: true, metrics: true, accounting: false, ...(JSON.parse(localStorage.getItem('faa_dash_toggles') || '{}')) } } catch { return { todos: true, progress: true, metrics: true, accounting: false } } })
@@ -258,6 +260,12 @@ export default function Dashboard() {
     setDetailId(null)
     showToast('Client deleted')
   }
+  // Archiving keeps all the client's data but drops them out of the day-to-day
+  // dashboards everywhere. Unarchive brings them right back.
+  async function setArchived(id, val) {
+    await patchInfo(id, { archived: val, archivedAt: val ? new Date().toISOString() : null })
+    showToast(val ? 'Client archived' : 'Client restored')
+  }
 
   // Turn an onboarding submission into a dashboard client. Seeds the client's
   // info with the onboarding answers (so their Success Map has the basis) and
@@ -302,14 +310,15 @@ export default function Dashboard() {
   const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
-  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSetColor={(id, v) => patchInfo(id, { color: v })} onSaveClient={saveClient} onDeleteClient={deleteClient} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} clientModeName={clients.find((c) => c.id === clientMode)?.name || ''} onExitClientMode={() => { exitClientMode(); setDetailId(null) }} cmSince={cmSince} hiddenSections={cmHidden} />
+  if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSetColor={(id, v) => patchInfo(id, { color: v })} onSaveClient={saveClient} onDeleteClient={deleteClient} onArchive={setArchived} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} clientModeName={clients.find((c) => c.id === clientMode)?.name || ''} onExitClientMode={() => { exitClientMode(); setDetailId(null) }} cmSince={cmSince} hiddenSections={cmHidden} />
 
   // Dashboard = consulting cockpit: show consulting clients (and untagged
   // ones, which default to consulting). Membership filtering lives in the
   // Client Portal.
   const shown = clientMode
     ? clients.filter((c) => c.id === clientMode)
-    : clients.filter((c) => (filter === 'all' || String(c.id) === String(filter)) && (getTiers(c).length === 0 || getTiers(c).includes('consulting')))
+    : clients.filter((c) => !isArchived(c) && (filter === 'all' || String(c.id) === String(filter)) && (getTiers(c).length === 0 || getTiers(c).includes('consulting')))
+  const archivedClients = clients.filter(isArchived)
   // Distinct link categories, for the "By category" view.
   const cats = [...new Set(links.map((l) => (l.category || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 
@@ -352,6 +361,11 @@ export default function Dashboard() {
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: toggles[k] ? '#18a866' : '#c0c6d8' }} />{label}
                     </button>
                   ))}
+                  <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.12)', margin: '0 2px' }} />
+                  <button onClick={() => setArchiveOpen(true)} title={'Archived clients' + (archivedClients.length ? ' (' + archivedClients.length + ')' : '')} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: 'transparent', color: MUTED, cursor: 'pointer' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="5" rx="1" /><path d="M4 8v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></svg>
+                    {archivedClients.length > 0 && <span style={{ position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, borderRadius: 8, background: NAVY, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{archivedClients.length}</span>}
+                  </button>
                 </div>
               )}
             </div>
@@ -359,7 +373,7 @@ export default function Dashboard() {
               <div style={ctrlPanel('rgba(11,29,94,0.04)')}>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
                   <button onClick={() => setFilter('all')} style={pill(filter === 'all')}>{compactFilter ? 'All' : 'All clients'}</button>
-                  {clients.map((c) => <button key={c.id} onClick={() => setFilter(c.id)} title={compactFilter ? c.name : undefined} style={pill(String(filter) === String(c.id))}>{compactFilter ? abbrOf(c) : c.name}</button>)}
+                  {clients.filter((c) => !isArchived(c)).map((c) => <button key={c.id} onClick={() => setFilter(c.id)} title={compactFilter ? c.name : undefined} style={pill(String(filter) === String(c.id))}>{compactFilter ? abbrOf(c) : c.name}</button>)}
                   <button onClick={toggleCompact} title="Toggle abbreviated client names" style={{ height: 28, padding: '0 12px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, background: 'transparent', color: MUTED, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>{compactFilter ? '↔ Full names' : '↔ Abbreviate'}</button>
                 </div>
               </div>
@@ -498,6 +512,34 @@ export default function Dashboard() {
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
       {addClientModal && <AddClientModal onClose={() => setAddClientModal(false)} onSave={addClient} />}
+      {archiveOpen && (
+        <div onClick={() => setArchiveOpen(false)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalBox, width: 460 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: NAVY, margin: 0 }}>Archived clients</h3>
+              <button onClick={() => setArchiveOpen(false)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+            <p style={{ fontSize: 12, color: MUTED, marginTop: 0, marginBottom: 14, lineHeight: 1.5 }}>Set aside but not deleted — their data is kept and they're hidden from every dashboard. Restore any time.</p>
+            {archivedClients.length === 0 ? (
+              <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic', padding: '18px 2px', textAlign: 'center' }}>No archived clients.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
+                {archivedClients.map((c) => (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 9, background: '#fff' }}>
+                    <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#9a9a96', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{ini(c.name)}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, color: TEXT, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                      {c.info?.archivedAt && <div style={{ fontSize: 11, color: MUTED }}>Archived {new Date(c.info.archivedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
+                    </div>
+                    <button onClick={() => { setDetailId(c.id); setArchiveOpen(false) }} style={miniBtn}>Open</button>
+                    <button onClick={() => setArchived(c.id, false)} style={{ ...miniBtn, borderColor: NAVY, color: NAVY }}>Restore</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {inboxOpen && <SubmissionsModal submissions={submissions} onAdd={addClientFromSubmission} onDismiss={dismissSubmission} onClose={() => setInboxOpen(false)} />}
       {selectModal && (
         <div onClick={() => setSelectModal(false)} style={overlay}>
@@ -708,7 +750,7 @@ function ClientColorPicker({ c, onSetColor }) {
   )
 }
 
-function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onSaveAbbr, onSetColor, onSaveClient, onDeleteClient, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast, clientMode, clientModeName, onExitClientMode, cmSince, hiddenSections }) {
+function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, onSavePractices, tiers, onToggleTier, onSetCadence, onSaveAbbr, onSetColor, onSaveClient, onDeleteClient, onArchive, onSaveNotes, onSavePayment, onDeletePayment, onSaveBilling, onEditPayment, canUndo, onUndo, toast, clientMode, clientModeName, onExitClientMode, cmSince, hiddenSections }) {
   const [linkEdit, setLinkEdit] = useState(null)
   const [pracFilter, setPracFilter] = useState(null)
   const [newPrac, setNewPrac] = useState('')
@@ -752,6 +794,12 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
             <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>{c.email || info.email || ''}</div>
           </div>
         </div>
+        {isArchived(c) && !clientMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(0,0,0,0.04)', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: TEXT, flex: 1 }}><strong style={{ fontWeight: 600 }}>Archived</strong>{info.archivedAt ? ' on ' + new Date(info.archivedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} — hidden from the dashboards. Data is kept.</span>
+            <button onClick={() => onArchive(c.id, false)} style={{ height: 30, padding: '0 14px', border: '0.5px solid ' + NAVY, borderRadius: 8, background: NAVY, color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Restore client</button>
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Short name</span>
           <input defaultValue={c.info?.abbr || ''} onBlur={(e) => onSaveAbbr(c.id, e.target.value)} placeholder={abbrOf({ name: c.name })} maxLength={8} style={{ width: 110, height: 30, padding: '0 10px', border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, fontSize: 13, color: TEXT, background: BG, fontFamily: 'inherit' }} />
@@ -861,7 +909,7 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
         )}
       </div>
       {linkEdit && <LinkModal modal={linkEdit} link={linkEdit.id ? links.find((l) => l.id === linkEdit.id) : null} clients={clients} onSave={(f) => { onSaveLink(f); setLinkEdit(null) }} onDelete={(id) => { onDeleteLink(id); setLinkEdit(null) }} onClose={() => setLinkEdit(null)} />}
-      {editOpen && <EditClientModal client={c} onSave={(f) => { onSaveClient(c.id, f); setEditOpen(false) }} onDelete={() => onDeleteClient(c.id)} onClose={() => setEditOpen(false)} />}
+      {editOpen && <EditClientModal client={c} onSave={(f) => { onSaveClient(c.id, f); setEditOpen(false) }} onDelete={() => onDeleteClient(c.id)} onArchive={() => { onArchive(c.id, !isArchived(c)); setEditOpen(false) }} archived={isArchived(c)} onClose={() => setEditOpen(false)} />}
       {billingModal && <AccountingModal modal={{ ...billingModal, clientId: c.id }} client={c} onClose={() => setBillingModal(null)} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} onSaveBilling={onSaveBilling} onEditPayment={onEditPayment} />}
       {confirmPrac && (
         <div onClick={() => setConfirmPrac(null)} style={overlay}>
@@ -1151,7 +1199,7 @@ function NotesSection({ client: c, onSave, clientMode, cmSince }) {
   )
 }
 
-function EditClientModal({ client: c, onSave, onDelete, onClose }) {
+function EditClientModal({ client: c, onSave, onDelete, onArchive, archived, onClose }) {
   const [f, setF] = useState({
     name: c.name || '', doctor: c.doctor || infoField(c, 'doctor') || '', email: c.email || infoField(c, 'email') || '',
     timezone: infoField(c, 'timezone') || '', website: infoField(c, 'website') || '',
@@ -1201,10 +1249,13 @@ function EditClientModal({ client: c, onSave, onDelete, onClose }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }}>
           {!confirmDel ? (
-            <button onClick={() => setConfirmDel(true)} style={{ ...btnGhost, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)', marginRight: 'auto' }}>Delete client</button>
+            <>
+              <button onClick={() => setConfirmDel(true)} style={{ ...btnGhost, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)', marginRight: 'auto' }}>Delete client</button>
+              <button onClick={onArchive} style={btnGhost}>{archived ? 'Restore from archive' : 'Archive client'}</button>
+            </>
           ) : (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginRight: 'auto' }}>
-              <span style={{ fontSize: 12, color: '#A32D2D' }}>Delete permanently?</span>
+              <span style={{ fontSize: 12, color: '#A32D2D' }}>Delete permanently? Consider archiving instead.</span>
               <button onClick={() => setConfirmDel(false)} style={{ ...btnGhost, height: 30 }}>No</button>
               <button onClick={onDelete} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, background: '#A32D2D', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Yes, delete</button>
             </div>

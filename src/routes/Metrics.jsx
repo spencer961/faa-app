@@ -4,6 +4,7 @@ import Chart from 'chart.js/auto'
 import Header from '../components/Header.jsx'
 import { supabase, SUPABASE_URL, SB_HEADERS } from '../lib/supabase.js'
 import { getClientMode } from '../lib/clientMode.js'
+import { isArchived } from '../lib/archive.js'
 import {
   METRICS, KEY_METRICS, INPUT_METRICS, fmtVal, benchClass, aggregate, bucketDaily, getWeekEnding, getMonthKey,
 } from '../lib/metrics.js'
@@ -34,7 +35,10 @@ export default function Metrics() {
   const [searchParams] = useSearchParams()
   const cm = (searchParams.get('client') ? parseInt(searchParams.get('client')) : null) || getClientMode()
   const [mainView, setMainView] = useState(cm ? 'trends' : 'yours')
-  const visibleClients = cm ? clients.filter((c) => c.id === cm) : clients
+  // Archived clients are hidden by default, but can be pulled in for comparison.
+  const [includeArchived, setIncludeArchived] = useState(false)
+  const archivedCount = clients.filter(isArchived).length
+  const visibleClients = cm ? clients.filter((c) => c.id === cm) : clients.filter((c) => includeArchived || !isArchived(c))
 
   useEffect(() => {
     ;(async () => {
@@ -68,6 +72,12 @@ export default function Metrics() {
         }
       />
       <div className="main">
+        {!cm && archivedCount > 0 && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginBottom: 14, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} style={{ cursor: 'pointer' }} />
+            Include archived clients ({archivedCount}) — for comparison
+          </label>
+        )}
         {mainView === 'yours' && <YoursView clients={visibleClients} data={data} />}
         {mainView === 'client' && <ClientView clients={visibleClients} data={data} setData={setData} />}
         {mainView === 'trends' && <TrendsView clients={visibleClients} data={data} />}
