@@ -100,7 +100,7 @@ function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, o
           <p style={{ fontSize: 13, color: MUTED, marginTop: 3, maxWidth: 460, lineHeight: 1.5 }}>{mode === 'consultant' ? 'What needs your review across your clients — check items off and leave a comment for your assistant.' : 'What needs you across your clients — the docs to review and the heads-up your assistant leaves, all in one place.'}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <Toggle options={[['consulting', 'Consulting'], ['all', 'All clients']]} value={filter} onChange={setFilter} />
+          <FilterMenu filter={filter} setFilter={setFilter} />
           <ModeMenu mode={mode} setMode={setMode} />
         </div>
       </div>
@@ -375,6 +375,34 @@ function Toggle({ options, value, onChange }) {
   )
 }
 
+// Which clients the board shows — condensed into a gear menu.
+function FilterMenu({ filter, setFilter }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  const OPTS = [['consulting', 'Consulting clients'], ['all', 'All clients']]
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button onClick={() => setOpen((o) => !o)} title="Filter clients" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 30, borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.12)', background: '#fff', color: MUTED, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: '#fff', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.16)', minWidth: 170, overflow: 'hidden', zIndex: 2000 }}>
+          <div style={{ padding: '8px 14px 5px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: MUTED }}>Show</div>
+          {OPTS.map(([v, l]) => (
+            <button key={v} onClick={() => { setFilter(v); setOpen(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', border: 'none', background: filter === v ? '#f2f4f8' : '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: filter === v ? 600 : 500, color: filter === v ? NAVY : TEXT, borderTop: '0.5px solid rgba(0,0,0,0.05)' }}>{l}{filter === v ? ' ✓' : ''}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // The assistant/consultant switch is a temporary stand-in until logins pick
 // the role automatically — so it's tucked into a quiet corner menu instead of
 // competing with the board's own controls.
@@ -389,10 +417,8 @@ function ModeMenu({ mode, setMode }) {
   }, [open])
   return (
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
-      <button onClick={() => setOpen((o) => !o)} title="Switch view" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.12)', background: '#fff', color: MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
-        <span style={{ color: TEXT, fontWeight: 500 }}>{mode === 'consultant' ? 'Consultant' : 'Assistant'}</span>
-        <span style={{ fontSize: 9 }}>▾</span>
+      <button onClick={() => setOpen((o) => !o)} title={mode === 'consultant' ? 'Consultant view' : 'Assistant view'} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 30, borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.12)', background: '#fff', color: mode === 'consultant' ? GOLD : MUTED, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
       </button>
       {open && (
         <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: '#fff', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.16)', minWidth: 190, overflow: 'hidden', zIndex: 2000 }}>
