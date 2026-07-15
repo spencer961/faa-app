@@ -61,7 +61,8 @@
       "Bash(git commit -q -m 'Hide tier badges on dashboard cards *)",
       "Bash(git commit -q -m 'Client Pulse: eye icon for the view switch, filter beside it *)",
       "Bash(git commit -q -m 'Client Pulse: condense filter into gear menu, eye icon-only + mode color *)",
-      "Bash(git commit -q -m 'Client Pulse: surface my to-dos on the client desk *)"
+      "Bash(git commit -q -m 'Client Pulse: surface my to-dos on the client desk *)",
+      "Bash(git commit -q -m 'Dashboard: open a card'\\\\''s review desk in a new tab *)"
     ]
   }
 }

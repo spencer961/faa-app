@@ -29,6 +29,8 @@ const CAT_PALETTE = [
 ]
 const catColor = (cat) => { let h = 0; for (const ch of String(cat || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return CAT_PALETTE[h % CAT_PALETTE.length] }
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+// Open a client's Client Pulse review desk in a new tab (consultant view).
+const openPulseTab = (clientId) => window.open(window.location.origin + window.location.pathname + '#/pulse?mode=consultant&client=' + clientId, '_blank', 'noopener')
 // Short name for the compact filter: a custom info.abbr if set, else the
 // acronym of the client's name.
 const abbrOf = (c) => {
@@ -431,11 +433,11 @@ export default function Dashboard() {
                 {(() => { const rev = (c.info?.reviewItems || []).filter((r) => !r.done); if (!rev.length) return null; const exp = reviewExp[c.id]; return (
                   <div style={{ marginBottom: 10 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 999, overflow: 'hidden', border: '0.5px solid rgba(24,127,212,0.4)', background: 'rgba(24,127,212,0.1)' }}>
-                      <span onClick={(e) => { e.stopPropagation(); navigate('/pulse?mode=consultant&client=' + c.id) }} title="Open review desk" style={{ padding: '2px 5px 2px 9px', fontSize: 11, fontWeight: 600, color: '#185fa5', cursor: 'pointer' }}>{rev.length} to review</span>
+                      <span onClick={(e) => { e.stopPropagation(); openPulseTab(c.id) }} title="Open review desk in a new tab" style={{ padding: '2px 5px 2px 9px', fontSize: 11, fontWeight: 600, color: '#185fa5', cursor: 'pointer' }}>{rev.length} to review</span>
                       <button onClick={(e) => { e.stopPropagation(); setReviewExp((m) => ({ ...m, [c.id]: !m[c.id] })) }} title={exp ? 'Collapse' : 'Expand'} style={{ background: 'none', border: 'none', borderLeft: '0.5px solid rgba(24,127,212,0.4)', color: '#185fa5', cursor: 'pointer', padding: '3px 7px', fontSize: 9, lineHeight: 1 }}>{exp ? '▲' : '▼'}</button>
                     </span>
                     {exp && (
-                      <div onClick={(e) => { e.stopPropagation(); navigate('/pulse?mode=consultant&client=' + c.id) }} style={{ marginTop: 6, background: 'rgba(24,127,212,0.07)', borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
+                      <div onClick={(e) => { e.stopPropagation(); openPulseTab(c.id) }} style={{ marginTop: 6, background: 'rgba(24,127,212,0.07)', borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
                         {rev.slice(0, 4).map((it) => <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#185fa5', padding: '1px 0' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: '#378add', flexShrink: 0 }} />{it.title}</div>)}
                         {rev.length > 4 && <div style={{ fontSize: 11, color: MUTED, paddingLeft: 12 }}>+{rev.length - 4} more</div>}
                       </div>
