@@ -242,18 +242,16 @@ function Individual({ c, mode, onBack, openTasks, healthPct, tasks = [], patchCl
   }, [c.id, mode])
   // The consultant's comment notifies the assistant (marks it unread for them).
   const onReply = (key, itemId, v) => updateItem(c.id, key, itemId, mode === 'consultant' ? { reply: v, commentUnread: true } : { reply: v })
-  // Checking an item off logs it to the client notes (so the profile has the
-  // full record), the first time it's completed.
+  // Every check / uncheck is logged to the client notes, so the profile keeps a
+  // running record: checking off writes "Reviewed"/"Noted", unchecking writes
+  // "Reopened" (it's back on the plate).
   const toggleItem = (key, it, doneKey) => {
     const nowDone = !it[doneKey]
-    const changes = { [doneKey]: nowDone }
-    const patchObj = {}
-    if (nowDone && !it.logged) {
-      changes.logged = true
-      const verb = key === 'reviewItems' ? 'Reviewed' : 'Noted'
-      patchObj.notesLog = [...(info.notesLog || []), { id: 'n' + Date.now(), text: verb + ': ' + it.title + (it.reply ? ' — ' + it.reply : ''), createdAt: new Date().toISOString(), editedAt: null, history: [], source: 'pulse' }]
+    const verb = nowDone ? (key === 'reviewItems' ? 'Reviewed' : 'Noted') : 'Reopened'
+    const patchObj = {
+      notesLog: [...(info.notesLog || []), { id: 'n' + Date.now(), text: verb + ': ' + it.title + (nowDone && it.reply ? ' — ' + it.reply : ''), createdAt: new Date().toISOString(), editedAt: null, history: [], source: 'pulse' }],
+      [key]: (info[key] || []).map((x) => (x.id === it.id ? { ...x, [doneKey]: nowDone } : x)),
     }
-    patchObj[key] = (info[key] || []).map((x) => (x.id === it.id ? { ...x, ...changes } : x))
     patchClient(c.id, patchObj)
   }
   return (
@@ -279,6 +277,18 @@ function Individual({ c, mode, onBack, openTasks, healthPct, tasks = [], patchCl
         </div>
       </div>
 
+      <Section title="Heads up" sub="The main things to be aware of" count={heads.filter((i) => !i.seen).length}>
+        {heads.length === 0 && <Empty>No heads-up items.</Empty>}
+        {heads.map((it) => <ItemRow key={it.id} it={it} doneKey="seen" canEdit={canEdit} onToggle={() => toggleItem('headsUp', it, 'seen')} onReply={(v) => onReply('headsUp', it.id, v)} onRemove={() => removeItem(c.id, 'headsUp', it.id)} />)}
+        {canEdit && <ItemComposer onAdd={(o) => addItem(c.id, 'headsUp', { id: uid(), seen: false, reply: '', createdAt: new Date().toISOString(), ...o })} />}
+      </Section>
+
+      <Section title="To review" count={review.filter((i) => !i.done).length}>
+        {review.length === 0 && <Empty>Nothing to review right now.</Empty>}
+        {review.map((it) => <ItemRow key={it.id} it={it} doneKey="done" hasLink canEdit={canEdit} onToggle={() => toggleItem('reviewItems', it, 'done')} onReply={(v) => onReply('reviewItems', it.id, v)} onRemove={() => removeItem(c.id, 'reviewItems', it.id)} />)}
+        {canEdit && <ItemComposer hasLink onAdd={(o) => addItem(c.id, 'reviewItems', { id: uid(), done: false, reply: '', createdAt: new Date().toISOString(), ...o })} />}
+      </Section>
+
       <div style={{ marginBottom: 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>My to-dos for {c.name.split(' ')[0]}</span>
@@ -302,18 +312,6 @@ function Individual({ c, mode, onBack, openTasks, healthPct, tasks = [], patchCl
           </div>
         )}
       </div>
-
-      <Section title="To review" count={review.filter((i) => !i.done).length}>
-        {review.length === 0 && <Empty>Nothing to review right now.</Empty>}
-        {review.map((it) => <ItemRow key={it.id} it={it} doneKey="done" hasLink canEdit={canEdit} onToggle={() => toggleItem('reviewItems', it, 'done')} onReply={(v) => onReply('reviewItems', it.id, v)} onRemove={() => removeItem(c.id, 'reviewItems', it.id)} />)}
-        {canEdit && <ItemComposer hasLink onAdd={(o) => addItem(c.id, 'reviewItems', { id: uid(), done: false, reply: '', createdAt: new Date().toISOString(), ...o })} />}
-      </Section>
-
-      <Section title="Heads up" count={heads.filter((i) => !i.seen).length}>
-        {heads.length === 0 && <Empty>No heads-up items.</Empty>}
-        {heads.map((it) => <ItemRow key={it.id} it={it} doneKey="seen" canEdit={canEdit} onToggle={() => toggleItem('headsUp', it, 'seen')} onReply={(v) => onReply('headsUp', it.id, v)} onRemove={() => removeItem(c.id, 'headsUp', it.id)} />)}
-        {canEdit && <ItemComposer onAdd={(o) => addItem(c.id, 'headsUp', { id: uid(), seen: false, reply: '', createdAt: new Date().toISOString(), ...o })} />}
-      </Section>
 
       <Section title="Notes &amp; history" sub="Synced with the client profile">
         {canEdit && <NoteAdd onAdd={(text) => addItem(c.id, 'notesLog', { id: 'n' + Date.now(), text, createdAt: new Date().toISOString(), editedAt: null, history: [] })} />}
