@@ -18,6 +18,15 @@ import { isArchived } from '../lib/archive.js'
 const PRIOS = [['high', 'High priority', '#ef4444'], ['medium', 'Needs a look', '#f59e0b'], ['low', 'Steady', '#22c55e']]
 const PRIO_COLOR = { high: '#ef4444', medium: '#f59e0b', low: '#22c55e' }
 const STATUSES = [['on_track', 'On track', '#18734a', 'rgba(24,168,102,0.12)'], ['watch', 'Watch', '#92600b', 'rgba(245,158,11,0.16)'], ['at_risk', 'At risk', '#b91c1c', 'rgba(239,68,68,0.1)']]
+// To-do (tasks table) display bits, mirrored from the To-Do Lists page.
+const TASK_SL = { not_started: 'Not started', in_progress: 'In progress', waiting: 'Waiting', done: 'Done' }
+const TASK_SC = { not_started: '#888786', in_progress: '#1a7fd4', waiting: '#e07b0a', done: '#18a866' }
+const TASK_PL = { high: 'High', medium: 'Medium', low: 'Low' }
+const TASK_PC = { high: '#d42020', medium: '#e07b0a', low: '#18a866' }
+// Until logins land, "me" is Spencer — the default assignee on the To-Do page.
+const ME = 'Spencer'
+const isMine = (t) => (t.assignee || '').trim().toLowerCase() === ME.toLowerCase()
+const fmtDue = (d) => { if (!d) return ''; try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) } catch { return d } }
 const uid = () => 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
 const loadSnaps = () => { try { return JSON.parse(localStorage.getItem('faa_success_snapshots')) || {} } catch { return {} } }
@@ -40,7 +49,7 @@ export default function ClientPulse() {
     ;(async () => {
       const { data: cs } = await supabase.from('clients').select('id,name,info,status').order('id')
       if (Array.isArray(cs)) setClients(cs)
-      const { data: ts } = await supabase.from('tasks').select('id,status,client_id')
+      const { data: ts } = await supabase.from('tasks').select('id,status,client_id,title,assignee,priority,due_date,notes')
       if (Array.isArray(ts)) setTasks(ts)
     })()
   }, [])
@@ -70,6 +79,7 @@ export default function ClientPulse() {
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 20px 60px' }}>
         {selClient ? (
           <Individual c={selClient} mode={mode} onBack={() => setSel(null)} openTasks={openTasks(selClient.id)} healthPct={clientHealth(selClient.id)}
+            tasks={tasks.filter((t) => t.client_id === selClient.id)}
             patchClient={patchClient} addItem={addItem} updateItem={updateItem} removeItem={removeItem} />
         ) : (
           <Overview groups={PRIOS.map(([key, label, color]) => ({ key, label, color, items: shown.filter((c) => (c.info?.priority || 'medium') === key) }))}
@@ -209,9 +219,13 @@ function ExpandedCard({ c, color, onOpen, ot, h }) {
   )
 }
 
-function Individual({ c, mode, onBack, openTasks, healthPct, patchClient, addItem, updateItem, removeItem }) {
+function Individual({ c, mode, onBack, openTasks, healthPct, tasks = [], patchClient, addItem, updateItem, removeItem }) {
   const info = c.info || {}
   const canEdit = mode === 'assistant'
+  const [taskModal, setTaskModal] = useState(null)
+  // The to-dos I owe this client — pulled from the To-Do Lists page, filtered
+  // to ones assigned to me and still open.
+  const myTodos = tasks.filter((t) => isMine(t) && t.status !== 'done')
   const priority = info.priority || 'medium'
   const status = info.status || ''
   const review = info.reviewItems || []
@@ -265,6 +279,30 @@ function Individual({ c, mode, onBack, openTasks, healthPct, patchClient, addIte
         </div>
       </div>
 
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>My to-dos for {c.name.split(' ')[0]}</span>
+          {myTodos.length > 0 && <span style={{ fontSize: 11, color: '#8a6a3c', background: 'rgba(188,151,98,0.18)', borderRadius: 999, padding: '1px 8px' }}>{myTodos.length}</span>}
+          <a href={'#/tasks?client=' + c.id} style={{ marginLeft: 'auto', fontSize: 12, color: NAVY, fontWeight: 500, textDecoration: 'none' }}>Open To-Do list ↗</a>
+        </div>
+        <div style={{ fontSize: 11, color: MUTED, marginBottom: 8 }}>What you owe {c.name.split(' ')[0]} — assigned to you on the To-Do list.</div>
+        {myTodos.length === 0 ? (
+          <Empty>Nothing on your plate for this client.</Empty>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {myTodos.map((t) => (
+              <div key={t.id} onClick={() => setTaskModal(t)} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '3px solid ' + (TASK_SC[t.status] || '#888'), borderRadius: 10, padding: '10px 13px', cursor: 'pointer' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: TASK_SC[t.status] || '#888', flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                {t.due_date && <span style={{ fontSize: 11, color: MUTED, whiteSpace: 'nowrap' }}>{fmtDue(t.due_date)}</span>}
+                <span style={{ fontSize: 10, color: TASK_PC[t.priority] || MUTED, border: '0.5px solid ' + (TASK_PC[t.priority] || 'rgba(0,0,0,0.15)'), borderRadius: 4, padding: '0 6px', whiteSpace: 'nowrap' }}>{TASK_PL[t.priority] || t.priority}</span>
+                <span style={{ color: '#c0c6d8', fontSize: 15 }}>›</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <Section title="To review" count={review.filter((i) => !i.done).length}>
         {review.length === 0 && <Empty>Nothing to review right now.</Empty>}
         {review.map((it) => <ItemRow key={it.id} it={it} doneKey="done" hasLink canEdit={canEdit} onToggle={() => toggleItem('reviewItems', it, 'done')} onReply={(v) => onReply('reviewItems', it.id, v)} onRemove={() => removeItem(c.id, 'reviewItems', it.id)} />)}
@@ -290,7 +328,33 @@ function Individual({ c, mode, onBack, openTasks, healthPct, patchClient, addIte
           )
         })}
       </Section>
+      {taskModal && <TaskModal t={taskModal} clientId={c.id} onClose={() => setTaskModal(null)} />}
     </>
+  )
+}
+
+// Read-only look at a single to-do, with a jump to the full To-Do list to edit.
+function TaskModal({ t, clientId, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 3000 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 440, maxWidth: '100%', padding: 22, boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: 17, fontWeight: 600, color: TEXT, flex: 1, lineHeight: 1.35 }}>{t.title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          <span style={{ fontSize: 12, color: '#fff', background: TASK_SC[t.status] || '#888', borderRadius: 999, padding: '3px 11px' }}>{TASK_SL[t.status] || t.status}</span>
+          <span style={{ fontSize: 12, color: TASK_PC[t.priority] || MUTED, border: '0.5px solid ' + (TASK_PC[t.priority] || 'rgba(0,0,0,0.15)'), borderRadius: 999, padding: '3px 11px' }}>{TASK_PL[t.priority] || t.priority} priority</span>
+          {t.due_date && <span style={{ fontSize: 12, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 999, padding: '3px 11px' }}>Due {fmtDue(t.due_date)}</span>}
+        </div>
+        {t.assignee && <div style={{ fontSize: 13, color: TEXT, marginBottom: 12 }}><span style={{ color: MUTED }}>Assigned to</span> &nbsp;{t.assignee}</div>}
+        {t.notes && <div style={{ fontSize: 13, color: '#44443f', lineHeight: 1.6, whiteSpace: 'pre-wrap', background: '#f7f6f4', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>{t.notes}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} style={btnGhost}>Close</button>
+          <a href={'#/tasks?client=' + clientId} style={{ ...btnPrimary, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Open in To-Do list ↗</a>
+        </div>
+      </div>
+    </div>
   )
 }
 
