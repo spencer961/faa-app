@@ -58,7 +58,8 @@
       "Bash(git commit -q -m 'Client color picker: trigger on the avatar, Google Calendar palette + custom *)",
       "Bash(git commit -q -m 'Revert client colors from avatars; keep picker in profile for future use *)",
       "Bash(git commit -q -m 'Archive clients — set aside without deleting, hidden across all apps *)",
-      "Bash(git commit -q -m 'Hide tier badges on dashboard cards *)"
+      "Bash(git commit -q -m 'Hide tier badges on dashboard cards *)",
+      "Bash(git commit -q -m 'Client Pulse: eye icon for the view switch, filter beside it *)"
     ]
   }
 }

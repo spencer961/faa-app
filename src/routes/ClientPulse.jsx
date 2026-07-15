@@ -99,10 +99,12 @@ function Overview({ groups, mode, setMode, clients, filter, setFilter, onOpen, o
           <h1 style={{ fontSize: 22, fontWeight: 600, color: TEXT, margin: 0 }}>Client Pulse</h1>
           <p style={{ fontSize: 13, color: MUTED, marginTop: 3, maxWidth: 460, lineHeight: 1.5 }}>{mode === 'consultant' ? 'What needs your review across your clients — check items off and leave a comment for your assistant.' : 'What needs you across your clients — the docs to review and the heads-up your assistant leaves, all in one place.'}</p>
         </div>
-        <ModeMenu mode={mode} setMode={setMode} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <Toggle options={[['consulting', 'Consulting'], ['all', 'All clients']]} value={filter} onChange={setFilter} />
+          <ModeMenu mode={mode} setMode={setMode} />
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-        <Toggle options={[['consulting', 'Consulting'], ['all', 'All clients']]} value={filter} onChange={setFilter} />
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
         <div style={{ marginLeft: 'auto' }}>
           <Toggle options={[['expanded', 'Expanded'], ['compact', 'Compact']]} value={view} onChange={setView} />
         </div>
@@ -388,7 +390,7 @@ function ModeMenu({ mode, setMode }) {
   return (
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button onClick={() => setOpen((o) => !o)} title="Switch view" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.12)', background: '#fff', color: MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
         <span style={{ color: TEXT, fontWeight: 500 }}>{mode === 'consultant' ? 'Consultant' : 'Assistant'}</span>
         <span style={{ fontSize: 9 }}>▾</span>
       </button>
