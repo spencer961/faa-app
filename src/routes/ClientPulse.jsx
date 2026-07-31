@@ -192,9 +192,9 @@ function ExpandedCard({ c, color, onOpen, ot, h }) {
     </div>
   )
   return (
-    <div onClick={() => onOpen(c.id)} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '3px solid ' + color, borderRadius: 10, padding: '13px 15px', cursor: 'pointer' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: (rev.length || fyi.length) ? 10 : 0 }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: TEXT }}>{c.name}</span>
+    <div onClick={() => onOpen(c.id)} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderLeft: '3px solid ' + color, borderRadius: 10, padding: '0 15px 13px', cursor: 'pointer', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 -15px 11px', padding: '10px 15px', background: '#f7f6f4', borderBottom: '0.5px solid rgba(0,0,0,0.07)' }}>
+        <span style={{ fontSize: 15.5, fontWeight: 700, color: TEXT }}>{c.name}</span>
         {st && <span style={{ fontSize: 11, color: st[2], background: st[3], borderRadius: 999, padding: '1px 9px' }}>{st[1]}</span>}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>
           <span title="Open to-dos">{ot} to-dos</span>{h !== null && <span title="Success Map health">{h}%</span>}
