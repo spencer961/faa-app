@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { NAVY, GOLD, TEXT, MUTED } from '../lib/theme.js'
 import { isSuperAdmin } from '../lib/auth.js'
+import { useAuth } from '../lib/AuthContext.jsx'
 
 // The navy/gold top bar — written once, used on every page.
 export default function Header({ sub, back, right, hideMenu }) {
@@ -20,6 +21,7 @@ export default function Header({ sub, back, right, hideMenu }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {right}
+        {!hideMenu && <AccountChip />}
         {!hideMenu && <NavMenu />}
       </div>
     </div>
@@ -35,8 +37,20 @@ const NAV = [
   { to: '/tasks', label: 'To-Do Lists' },
   { to: '/onboarding', label: 'Onboarding Form' },
   { to: '/portal', label: 'Client Portal' },
-  ...(isSuperAdmin() ? [{ to: '/admin', label: 'Super Admin' }] : []),
 ]
+
+// Signed-in identity + sign out, in the header bar.
+function AccountChip() {
+  const { user, profile, signOut } = useAuth()
+  if (!user) return null
+  const who = profile?.display_name || user.email || ''
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span title={user.email || ''} style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
+      <button onClick={signOut} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.85)', padding: '5px 11px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>Sign out</button>
+    </div>
+  )
+}
 
 function NavMenu() {
   const [open, setOpen] = useState(false)
@@ -55,7 +69,7 @@ function NavMenu() {
       {open && (
         <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: '#fff', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.16)', minWidth: 196, overflow: 'hidden', zIndex: 2000 }}>
           <div style={{ padding: '7px 14px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: MUTED, background: '#f7f6f4', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>Go to</div>
-          {NAV.map((item) => (
+          {(isSuperAdmin() ? [...NAV, { to: '/admin', label: 'Super Admin' }] : NAV).map((item) => (
             <Link
               key={item.to}
               to={item.to}

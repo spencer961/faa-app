@@ -8,10 +8,18 @@ import Tasks from './routes/Tasks.jsx'
 import ClientPortal from './routes/ClientPortal.jsx'
 import SuperAdmin from './routes/SuperAdmin.jsx'
 import ClientPulse from './routes/ClientPulse.jsx'
+import Login, { Splash } from './routes/Login.jsx'
+import { useAuth } from './lib/AuthContext.jsx'
 
 // Every "page" is now a route in one app. Each still lives in its own
 // file — editing one doesn't touch the others.
 export default function App() {
+  // Gate the whole app behind a login (Phase 1 — internal only). While the
+  // session is being restored we show a splash so the app never flashes.
+  const { loading, user } = useAuth()
+  if (loading) return <Splash />
+  if (!user) return <Login />
+
   return (
     <Routes>
       <Route path="/" element={<Home />} />

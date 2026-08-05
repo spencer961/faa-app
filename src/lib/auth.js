@@ -1,22 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────
-// Admin gate — placeholder until real logins are added.
+// Role gate. The logged-in user's role is cached here by AuthProvider
+// (via setAuthRole) so these plain helpers stay real without every call
+// site needing the useAuth() hook — important because Header builds its
+// nav list at import time, outside any component render.
 //
-// Right now there are no logins, so whoever is using the app is you (the
-// admin). Every admin-only control — like the Client Portal's "Access
-// settings" — is wrapped in isAdmin(). The moment real authentication is
-// added, this becomes a real role check, and all of those controls
-// automatically DISAPPEAR for client logins. A client will only ever see
-// their own portal, never admin settings.
-//
-// When wiring auth: return true only for users whose account role is
-// 'admin' (e.g. from Supabase Auth), false for client logins.
+// Roles: 'super_admin' (owner + assistant today) | 'consultant' |
+// 'assistant' | 'client'. Client logins (Phase 3) get 'client' and will
+// only ever see their own portal — every admin-only control is wrapped in
+// isAdmin()/isSuperAdmin() and disappears for them automatically.
 // ─────────────────────────────────────────────────────────────────────
-export const isAdmin = () => {
-  // TODO (auth step): replace with the logged-in user's role === 'admin'.
-  return true
-}
 
-// Super admin — the owner (you). Can manage tiers, pricing, guides, team,
-// approvals, integrations, and backups. Regular admins won't see these.
-// TODO (auth step): return the logged-in user's role === 'super_admin'.
-export const isSuperAdmin = () => true
+let _role = null
+
+// Called by AuthProvider whenever the profile (and therefore role) changes.
+export const setAuthRole = (role) => { _role = role }
+
+// Any internal staff member.
+export const isAdmin = () => ['super_admin', 'consultant', 'assistant'].includes(_role)
+
+// The owner tier — tiers, pricing, guides, team, integrations, backups.
+export const isSuperAdmin = () => _role === 'super_admin'
