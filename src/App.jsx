@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import Home from './routes/Home.jsx'
 import Onboarding from './routes/Onboarding.jsx'
 import Dashboard from './routes/Dashboard.jsx'
@@ -14,11 +14,14 @@ import { useAuth } from './lib/AuthContext.jsx'
 // Every "page" is now a route in one app. Each still lives in its own
 // file — editing one doesn't touch the others.
 export default function App() {
-  // Gate the whole app behind a login (Phase 1 — internal only). While the
-  // session is being restored we show a splash so the app never flashes.
+  // Gate the app behind a login — except the public prospect intake form,
+  // which anyone can reach. While the session is being restored we show a
+  // splash so the app never flashes.
   const { loading, user } = useAuth()
+  const { pathname } = useLocation()
+  const isPublic = pathname === '/onboarding'
   if (loading) return <Splash />
-  if (!user) return <Login />
+  if (!user && !isPublic) return <Login />
 
   return (
     <Routes>

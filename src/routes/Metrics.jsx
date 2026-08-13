@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Chart from 'chart.js/auto'
 import Header from '../components/Header.jsx'
-import { supabase, SUPABASE_URL, SB_HEADERS } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.js'
 import { getClientMode } from '../lib/clientMode.js'
 import { isArchived } from '../lib/archive.js'
 import {
@@ -182,11 +182,7 @@ function ClientView({ clients, data, setData }) {
     const client = clients.find((c) => c.id === cid)
     const clean = {}
     INPUT_METRICS.forEach((m) => { if (form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null) clean[m.id] = parseFloat(form[m.id]) || 0 })
-    await fetch(`${SUPABASE_URL}/rest/v1/metrics_tracker`, {
-      method: 'POST',
-      headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ client_id: cid, client_name: client?.name || '', period: 'daily', date_key: date, data: clean, responsible: {}, updated_at: new Date().toISOString() }),
-    })
+    await supabase.from('metrics_tracker').upsert({ client_id: cid, client_name: client?.name || '', period: 'daily', date_key: date, data: clean, responsible: {}, updated_at: new Date().toISOString() }, { onConflict: 'client_id,period,date_key' })
     setData((md) => ({ ...md, [cid]: { ...(md[cid] || {}), daily: { ...(md[cid]?.daily || {}), [date]: clean } } }))
     setDirty(false)
     showToast('Saved ✓')
@@ -347,7 +343,7 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
       if (Object.keys(clean).length) rows.push({ client_id: cid, client_name: client?.name || '', period: 'daily', date_key: dk, data: clean, responsible: {}, updated_at: new Date().toISOString() })
     })
     if (!rows.length) { showToast('Nothing to save'); return }
-    await fetch(`${SUPABASE_URL}/rest/v1/metrics_tracker`, { method: 'POST', headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) })
+    await supabase.from('metrics_tracker').upsert(rows, { onConflict: 'client_id,period,date_key' })
     setData((md) => { const daily = { ...(md[cid]?.daily || {}) }; rows.forEach((r) => { daily[r.date_key] = r.data }); return { ...md, [cid]: { ...(md[cid] || {}), daily } } })
     setDirty(false); const unit = weekly ? 'week' : 'day'; showToast('Saved ' + rows.length + ' ' + unit + (rows.length !== 1 ? 's' : '') + ' ✓')
   }
