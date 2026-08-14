@@ -66,11 +66,14 @@ export default function SuccessMap() {
 function HomeView({ clients, snaps, onOpen, onForm, onAssess }) {
   // Archived clients are hidden by default; opt in to compare them alongside.
   const [includeArchived, setIncludeArchived] = useState(false)
+  const [filterId, setFilterId] = useState('all')
   const archivedCount = clients.filter(isArchived).length
   const visible = includeArchived ? clients : clients.filter((c) => !isArchived(c))
+  const shown = filterId === 'all' ? visible : visible.filter((c) => String(c.id) === String(filterId))
   const latestH = (id) => { const s = (snaps[id] || []); return s.length ? health(s[s.length - 1].scores) : null }
   const scored = visible.filter((c) => latestH(c.id) !== null)
   const avg = scored.length ? Math.round(scored.reduce((a, c) => a + latestH(c.id), 0) / scored.length) : 0
+  const fpill = (on) => ({ padding: '5px 12px', borderRadius: 999, border: '0.5px solid ' + (on ? NAVY : 'rgba(0,0,0,0.15)'), background: on ? NAVY : '#fff', color: on ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' })
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Success Map — Consultant view" back="/" />
@@ -92,8 +95,14 @@ function HomeView({ clients, snaps, onOpen, onForm, onAssess }) {
             </label>
           )}
         </div>
+        {visible.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+            <button onClick={() => setFilterId('all')} style={fpill(filterId === 'all')}>All clients</button>
+            {visible.map((c) => <button key={c.id} onClick={() => setFilterId(c.id)} style={fpill(String(filterId) === String(c.id))}>{c.name}</button>)}
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
-          {visible.map((c) => {
+          {shown.map((c) => {
             const s = clientSnapsSorted(snaps[c.id])
             const lat = s[s.length - 1], fst = s[0]
             const latH = lat ? health(lat.scores) : 0
@@ -123,7 +132,7 @@ function HomeView({ clients, snaps, onOpen, onForm, onAssess }) {
               </div>
             )
           })}
-          {!visible.length && <div style={{ ...CARD, textAlign: 'center', padding: '40px 24px', gridColumn: '1/-1', color: MUTED, fontSize: 14 }}>{clients.length ? 'No active clients.' : 'Loading clients…'}</div>}
+          {!shown.length && <div style={{ ...CARD, textAlign: 'center', padding: '40px 24px', gridColumn: '1/-1', color: MUTED, fontSize: 14 }}>{clients.length ? 'No clients match.' : 'Loading clients…'}</div>}
         </div>
       </div>
     </div>
