@@ -61,8 +61,8 @@ export default function Sidebar() {
 
   return (
     <aside style={{ width: w, flexShrink: 0, background: NAVY, display: 'flex', flexDirection: 'column', color: 'rgba(255,255,255,0.72)', position: 'relative', transition: 'width 0.18s ease', height: '100%' }}>
-      <button onClick={toggle} title={collapsed ? 'Expand' : 'Collapse'} aria-label="Toggle sidebar" style={{ position: 'absolute', top: 64, right: -12, width: 24, height: 24, borderRadius: '50%', background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', boxShadow: '0 2px 8px rgba(0,0,0,0.16)', color: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 5, padding: 0 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsed ? 'rotate(180deg)' : 'none' }}><path d="m15 18-6-6 6-6" /></svg>
+      <button onClick={toggle} title={collapsed ? 'Expand menu' : 'Collapse menu'} aria-label="Toggle sidebar" style={{ position: 'absolute', top: 64, right: -12, width: 26, height: 26, borderRadius: '50%', background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', boxShadow: '0 2px 8px rgba(0,0,0,0.16)', color: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 5, padding: 0 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
       </button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: collapsed ? '18px 0 16px' : '18px 18px 16px', justifyContent: collapsed ? 'center' : 'flex-start', whiteSpace: 'nowrap', overflow: 'hidden' }}>

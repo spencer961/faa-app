@@ -137,7 +137,7 @@ function PortalView({ client, tasks, snaps, metricsByClient, tierAccess, adminBa
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
-      <Header sub="Client Portal" back="/" right={adminBack && (
+      <Header sub="Client Portal" back={adminBack && (
         <button onClick={adminBack} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.15)', color: NAVY, padding: '7px 13px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: 'inherit' }}>← All portals</button>
       )} />
       <div style={{ maxWidth: 940, margin: '0 auto', padding: '28px 20px 60px' }}>

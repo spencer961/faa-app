@@ -425,25 +425,24 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                {ct.todos && openN > 0 && (
-                  <div style={{ marginBottom: 10 }}>
+                {/* Fixed-height pill row (to-dos + to-review) so cards line up whether or not pills are present. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minHeight: 24, marginBottom: 10 }}>
+                  {ct.todos && openN > 0 && (
                     <span onClick={(e) => go(e, '/tasks')} title="Open to-dos" style={{ display: 'inline-block', background: 'rgba(188,151,98,0.15)', color: '#8a6a3c', border: '0.5px solid rgba(188,151,98,0.4)', borderRadius: 999, fontSize: 11, fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>{openN} to-do{openN !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-                {(() => { const rev = (c.info?.reviewItems || []).filter((r) => !r.done); if (!rev.length) return null; const exp = reviewExp[c.id]; return (
-                  <div style={{ marginBottom: 10 }}>
+                  )}
+                  {(c.info?.reviewItems || []).filter((r) => !r.done).length > 0 && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 999, overflow: 'hidden', border: '0.5px solid rgba(24,127,212,0.4)', background: 'rgba(24,127,212,0.1)' }}>
-                      <span onClick={(e) => { e.stopPropagation(); openPulseTab(c.id) }} title="Open review desk in a new tab" style={{ padding: '2px 5px 2px 9px', fontSize: 11, fontWeight: 600, color: '#185fa5', cursor: 'pointer' }}>{rev.length} to review</span>
-                      <button onClick={(e) => { e.stopPropagation(); setReviewExp((m) => ({ ...m, [c.id]: !m[c.id] })) }} title={exp ? 'Collapse' : 'Expand'} style={{ background: 'none', border: 'none', borderLeft: '0.5px solid rgba(24,127,212,0.4)', color: '#185fa5', cursor: 'pointer', padding: '3px 7px', fontSize: 9, lineHeight: 1 }}>{exp ? '▲' : '▼'}</button>
+                      <span onClick={(e) => { e.stopPropagation(); openPulseTab(c.id) }} title="Open review desk in a new tab" style={{ padding: '2px 5px 2px 9px', fontSize: 11, fontWeight: 600, color: '#185fa5', cursor: 'pointer' }}>{(c.info?.reviewItems || []).filter((r) => !r.done).length} to review</span>
+                      <button onClick={(e) => { e.stopPropagation(); setReviewExp((m) => ({ ...m, [c.id]: !m[c.id] })) }} title={reviewExp[c.id] ? 'Collapse' : 'Expand'} style={{ background: 'none', border: 'none', borderLeft: '0.5px solid rgba(24,127,212,0.4)', color: '#185fa5', cursor: 'pointer', padding: '3px 7px', fontSize: 9, lineHeight: 1 }}>{reviewExp[c.id] ? '▲' : '▼'}</button>
                     </span>
-                    {exp && (
-                      <div onClick={(e) => { e.stopPropagation(); openPulseTab(c.id) }} style={{ marginTop: 6, background: 'rgba(24,127,212,0.07)', borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
-                        {rev.slice(0, 4).map((it) => <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#185fa5', padding: '1px 0' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: '#378add', flexShrink: 0 }} />{it.title}</div>)}
-                        {rev.length > 4 && <div style={{ fontSize: 11, color: MUTED, paddingLeft: 12 }}>+{rev.length - 4} more</div>}
-                      </div>
-                    )}
+                  )}
+                </div>
+                {(() => { const rev = (c.info?.reviewItems || []).filter((r) => !r.done); return rev.length > 0 && reviewExp[c.id] ? (
+                  <div onClick={(e) => { e.stopPropagation(); openPulseTab(c.id) }} style={{ marginTop: -4, marginBottom: 10, background: 'rgba(24,127,212,0.07)', borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
+                    {rev.slice(0, 4).map((it) => <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#185fa5', padding: '1px 0' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: '#378add', flexShrink: 0 }} />{it.title}</div>)}
+                    {rev.length > 4 && <div style={{ fontSize: 11, color: MUTED, paddingLeft: 12 }}>+{rev.length - 4} more</div>}
                   </div>
-                ) })()}
+                ) : null })()}
                 {ct.progress && (
                   <div onClick={(e) => go(e, '/success-map')} style={{ marginBottom: 10, cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
@@ -776,19 +775,13 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
   const showSec = (id) => !(clientMode && (hiddenSections || []).includes(id))
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
-      <Header sub="Client Detail" back={clientMode ? undefined : '/'} hideMenu={clientMode} right={clientMode ? (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={onBack} style={HBTN}>← Back</button>
-          <button onClick={() => setEndCM(true)} style={{ ...HBTN, gap: 7, background: 'rgba(24,168,102,0.12)', border: '0.5px solid rgba(24,168,102,0.5)', color: '#0f7a49' }}>
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18a866', boxShadow: '0 0 6px #18a866', flexShrink: 0 }} />
-            {clientModeName}
-          </button>
-        </div>
+      <Header sub="Client Detail" back={<button onClick={onBack} style={HBTN}>{clientMode ? '← Back' : '← All clients'}</button>} right={clientMode ? (
+        <button onClick={() => setEndCM(true)} style={{ ...HBTN, gap: 7, background: 'rgba(24,168,102,0.12)', border: '0.5px solid rgba(24,168,102,0.5)', color: '#0f7a49' }}>
+          <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18a866', boxShadow: '0 0 6px #18a866', flexShrink: 0 }} />
+          {clientModeName}
+        </button>
       ) : (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setEditOpen(true)} style={{ ...HBTN, background: GOLD, color: NAVY, border: 'none', fontWeight: 600 }}>Edit profile</button>
-          <button onClick={onBack} style={HBTN}>← All clients</button>
-        </div>
+        <button onClick={() => setEditOpen(true)} style={{ ...HBTN, background: GOLD, color: NAVY, border: 'none', fontWeight: 600 }}>Edit profile</button>
       )} />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>

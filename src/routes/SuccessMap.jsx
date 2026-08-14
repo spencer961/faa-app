@@ -149,7 +149,7 @@ function ClientMap({ client, snaps, selM, setSelM, exp, setExp, onBack, onAssess
   if (!snaps.length) {
     return (
       <div style={{ minHeight: '100vh', background: BG }}>
-        <Header sub={client.name} back="/" right={<HdrBtn onClick={onBack}>← All clients</HdrBtn>} />
+        <Header sub={client.name} back={<HdrBtn onClick={onBack}>← All clients</HdrBtn>} />
         <div style={{ maxWidth: 640, margin: '60px auto', padding: '0 20px' }}>
           <div style={{ ...CARD, textAlign: 'center', padding: '48px 40px' }}>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: TEXT, marginBottom: 10 }}>No assessment yet</h2>
@@ -173,9 +173,8 @@ function ClientMap({ client, snaps, selM, setSelM, exp, setExp, onBack, onAssess
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
-      <Header sub={det.label} back="/" right={<div style={{ display: 'flex', gap: 8 }}>
+      <Header sub={det.label} back={<HdrBtn onClick={onBack}>← All clients</HdrBtn>} right={<div style={{ display: 'flex', gap: 8 }}>
         <HdrBtn onClick={onForm}>View Form</HdrBtn>
-        <HdrBtn onClick={onBack}>← All clients</HdrBtn>
         <button onClick={() => onAssess({ ...snaps[snaps.length - 1].scores })} style={{ ...BTNP, background: GOLD, color: NAVY, fontSize: 12, padding: '7px 14px' }}>+ New Month</button>
       </div>} />
       <div style={{ maxWidth: 1060, margin: '0 auto', padding: '24px 20px' }}>
@@ -273,10 +272,7 @@ function Assessment({ client, ass, setAss, cycleScore, onCancel, onPublish }) {
   const hp = Math.round((gc / ALL.length) * 100)
   return (
     <div style={{ background: BG, display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <Header sub="Assessment" right={<div style={{ display: 'flex', gap: 8 }}>
-        <HdrBtn onClick={onCancel}>← Cancel</HdrBtn>
-        <button onClick={onPublish} disabled={!ass.label.trim()} style={{ ...BTNP, background: GOLD, color: NAVY, opacity: ass.label.trim() ? 1 : 0.5 }}>Publish Assessment →</button>
-      </div>} />
+      <Header sub="Assessment" back={<HdrBtn onClick={onCancel}>← Cancel</HdrBtn>} right={<button onClick={onPublish} disabled={!ass.label.trim()} style={{ ...BTNP, background: GOLD, color: NAVY, opacity: ass.label.trim() ? 1 : 0.5 }}>Publish Assessment →</button>} />
       <style>{SM_GRID_CSS}</style>
       <div className="sm-assess-grid" style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', flex: 1, overflow: 'hidden' }}>
         <div style={{ overflowY: 'auto', padding: 20 }}>
@@ -312,10 +308,7 @@ function FormReview({ client, snaps, onBack, onAssess }) {
   const a = client.answers || {}
   return (
     <div style={{ background: BG, display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <Header sub="Form Review" right={<div style={{ display: 'flex', gap: 8 }}>
-        <HdrBtn onClick={onBack}>← All clients</HdrBtn>
-        <button onClick={onAssess} style={{ ...BTNP, background: GOLD, color: NAVY }}>{snaps.length ? 'New Assessment →' : 'Start Assessment →'}</button>
-      </div>} />
+      <Header sub="Form Review" back={<HdrBtn onClick={onBack}>← All clients</HdrBtn>} right={<button onClick={onAssess} style={{ ...BTNP, background: GOLD, color: NAVY }}>{snaps.length ? 'New Assessment →' : 'Start Assessment →'}</button>} />
       <style>{SM_GRID_CSS}</style>
       <div className="sm-assess-grid" style={{ display: 'grid', gridTemplateColumns: snaps.length ? '1.3fr 1fr' : '1fr', flex: 1, overflow: 'hidden' }}>
         <div style={{ overflowY: 'auto', padding: 24 }}>
