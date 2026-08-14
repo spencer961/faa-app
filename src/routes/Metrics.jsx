@@ -514,9 +514,9 @@ function TrendsView({ clients, data }) {
 
 const CSS = `
 .mx{min-height:100vh;background:#f5f5f4;color:#1a1a1a;font-size:13px;}
-.mx .tabs{display:flex;background:rgba(255,255,255,0.12);border-radius:8px;padding:3px;gap:2px;}
-.mx .tab{padding:5px 14px;border-radius:6px;border:none;background:transparent;color:rgba(255,255,255,0.7);font-size:12px;cursor:pointer;}
-.mx .tab.active{background:#fff;color:#0b1d5e;font-weight:600;}
+.mx .tabs{display:flex;background:#eeece8;border-radius:8px;padding:3px;gap:2px;}
+.mx .tab{padding:5px 14px;border-radius:6px;border:none;background:transparent;color:#8a8985;font-size:12px;cursor:pointer;font-family:inherit;}
+.mx .tab.active{background:#fff;color:#0b1d5e;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,0.1);}
 .mx .main{max-width:1100px;margin:0 auto;padding:20px;}
 .mx .card{background:#fff;border:0.5px solid rgba(0,0,0,0.1);border-radius:10px;overflow:hidden;}
 .mx .card-head{padding:10px 14px;border-bottom:0.5px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:space-between;}

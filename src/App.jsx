@@ -10,6 +10,7 @@ import SuperAdmin from './routes/SuperAdmin.jsx'
 import ClientPulse from './routes/ClientPulse.jsx'
 import Login, { Splash } from './routes/Login.jsx'
 import { useAuth } from './lib/AuthContext.jsx'
+import AppShell from './components/AppShell.jsx'
 
 // Every "page" is now a route in one app. Each still lives in its own
 // file — editing one doesn't touch the others.
@@ -20,10 +21,7 @@ export default function App() {
   const { loading, user } = useAuth()
   const { pathname } = useLocation()
   const isPublic = pathname === '/onboarding'
-  if (loading) return <Splash />
-  if (!user && !isPublic) return <Login />
-
-  return (
+  const routes = (
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/onboarding" element={<Onboarding />} />
@@ -36,4 +34,10 @@ export default function App() {
       <Route path="/admin" element={<SuperAdmin />} />
     </Routes>
   )
+
+  if (loading) return <Splash />
+  if (!user && !isPublic) return <Login />
+  // Logged-in staff always get the app shell (sidebar). A logged-out prospect
+  // on the public intake form gets it bare — no sidebar.
+  return user ? <AppShell>{routes}</AppShell> : routes
 }

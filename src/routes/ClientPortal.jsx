@@ -69,7 +69,7 @@ export default function ClientPortal() {
     return (
       <div style={{ minHeight: '100vh', background: BG }}>
         <Header sub="Client Portal" back="/" right={isAdmin() ? (
-          <button onClick={() => setSettingsOpen(true)} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>⚙ Access settings</button>
+          <button onClick={() => setSettingsOpen(true)} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.15)', color: NAVY, padding: '7px 13px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: 'inherit' }}>⚙ Access settings</button>
         ) : null} />
         {isAdmin() && settingsOpen && <AccessSettingsModal tiers={tiers} access={tierAccess} onSave={persistAccess} onClose={() => setSettingsOpen(false)} />}
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 20px' }}>
@@ -138,7 +138,7 @@ function PortalView({ client, tasks, snaps, metricsByClient, tierAccess, adminBa
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Client Portal" back="/" right={adminBack && (
-        <button onClick={adminBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← All portals</button>
+        <button onClick={adminBack} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.15)', color: NAVY, padding: '7px 13px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: 'inherit' }}>← All portals</button>
       )} />
       <div style={{ maxWidth: 940, margin: '0 auto', padding: '28px 20px 60px' }}>
         <div style={{ marginBottom: 24 }}>

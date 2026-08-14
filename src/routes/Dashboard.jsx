@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { supabase } from '../lib/supabase.js'
-import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
+import { NAVY, GOLD, BG, TEXT, MUTED, HBTN } from '../lib/theme.js'
 import { aggregate, METRICS, fmtVal } from '../lib/metrics.js'
 import { health } from '../lib/successMap.js'
 import { DEFAULT_TIERS, TIER_PALETTE, getClientTiers as getTiers } from '../lib/tiers.js'
@@ -328,22 +328,22 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Command Center" back={clientMode ? undefined : '/'} hideMenu={clientMode} right={
         clientMode ? (
-          <button onClick={() => setEndModal(true)} title="You're in Client Mode — click to end" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(24,168,102,0.18)', border: '0.5px solid rgba(24,168,102,0.55)', color: '#fff', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
+          <button onClick={() => setEndModal(true)} title="You're in Client Mode — click to end" style={{ ...HBTN, gap: 8, background: 'rgba(24,168,102,0.12)', border: '0.5px solid rgba(24,168,102,0.5)', color: '#0f7a49' }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18a866', boxShadow: '0 0 6px #18a866', flexShrink: 0 }} />
             {clients.find((c) => c.id === clientMode)?.name || ''}
           </button>
         ) : (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => setInboxOpen(true)} title="Onboarding submissions" style={{ position: 'relative', width: 34, height: 34, borderRadius: 7, border: '0.5px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={() => setInboxOpen(true)} title="Onboarding submissions" style={{ position: 'relative', width: 34, height: 32, borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: '#fff', color: NAVY, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>
-              {submissions.filter((s) => !s.reviewed).length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, background: '#d42020', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '1.5px solid #0b1d5e' }}>{submissions.filter((s) => !s.reviewed).length}</span>}
+              {submissions.filter((s) => !s.reviewed).length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, background: '#d42020', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '1.5px solid #fff' }}>{submissions.filter((s) => !s.reviewed).length}</span>}
             </button>
             {(() => { const n = clients.reduce((a, c) => a + (c.info?.reviewItems || []).filter((i) => !i.done).length, 0); return (
-              <button onClick={() => navigate('/pulse?mode=consultant')} title="Your review desk" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>To review{n > 0 && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: GOLD, color: NAVY, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{n}</span>}</button>
+              <button onClick={() => navigate('/pulse?mode=consultant')} title="Your review desk" style={{ ...HBTN, position: 'relative' }}>To review{n > 0 && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: GOLD, color: NAVY, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{n}</span>}</button>
             ) })()}
-            <button onClick={() => setAddClientModal(true)} style={{ background: GOLD, border: 'none', color: NAVY, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>+ Client</button>
-            <button onClick={() => setSelectModal(true)} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Client Mode</button>
-            <button onClick={() => setEditMode((e) => !e)} style={{ background: editMode ? GOLD : 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: editMode ? NAVY : 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>{editMode ? 'Done editing' : 'Edit links'}</button>
+            <button onClick={() => setAddClientModal(true)} style={{ ...HBTN, background: GOLD, color: NAVY, border: 'none', fontWeight: 600 }}>+ Client</button>
+            <button onClick={() => setSelectModal(true)} style={HBTN}>Client Mode</button>
+            <button onClick={() => setEditMode((e) => !e)} style={editMode ? { ...HBTN, background: GOLD, color: NAVY, border: 'none' } : HBTN}>{editMode ? 'Done editing' : 'Edit links'}</button>
           </div>
         )
       } />
@@ -778,16 +778,16 @@ function Detail({ client: c, links, onBack, clients, onSaveLink, onDeleteLink, o
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Client Detail" back={clientMode ? undefined : '/'} hideMenu={clientMode} right={clientMode ? (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← Back</button>
-          <button onClick={() => setEndCM(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(24,232,138,0.14)', border: '0.5px solid rgba(24,232,138,0.4)', color: '#18e88a', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18e88a', boxShadow: '0 0 7px #18e88a', flexShrink: 0 }} />
+          <button onClick={onBack} style={HBTN}>← Back</button>
+          <button onClick={() => setEndCM(true)} style={{ ...HBTN, gap: 7, background: 'rgba(24,168,102,0.12)', border: '0.5px solid rgba(24,168,102,0.5)', color: '#0f7a49' }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#18a866', boxShadow: '0 0 6px #18a866', flexShrink: 0 }} />
             {clientModeName}
           </button>
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setEditOpen(true)} style={{ background: GOLD, border: 'none', color: NAVY, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Edit profile</button>
-          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← All clients</button>
+          <button onClick={() => setEditOpen(true)} style={{ ...HBTN, background: GOLD, color: NAVY, border: 'none', fontWeight: 600 }}>Edit profile</button>
+          <button onClick={onBack} style={HBTN}>← All clients</button>
         </div>
       )} />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>

@@ -33,3 +33,11 @@ export const BTNS = {
   background: 'transparent', color: TEXT, cursor: 'pointer', fontSize: 13,
   fontFamily: FONT,
 }
+// Action buttons for the slim (light) page top bar — used in each page's
+// Header `right` slot. HBTN = neutral; HBTN_P = primary (navy/gold).
+export const HBTN = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 13px',
+  borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: '#fff', color: NAVY,
+  fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap',
+}
+export const HBTN_P = { ...HBTN, background: NAVY, color: GOLD, border: 'none' }

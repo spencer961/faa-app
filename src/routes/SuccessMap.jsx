@@ -371,7 +371,7 @@ function CatBar({ scores }) {
   )
 }
 function HdrBtn({ onClick, children }) {
-  return <button onClick={onClick} style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>{children}</button>
+  return <button onClick={onClick} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.15)', color: NAVY, padding: '7px 13px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{children}</button>
 }
 function ScoringPanel({ scores, onCycle, fillCell }) {
   const ALL = leafIds(CATS)

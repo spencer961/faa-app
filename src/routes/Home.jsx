@@ -14,7 +14,7 @@ const TOOLS = [
 export default function Home() {
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
-      <Header sub="Internal platform" />
+      <Header sub="Home" />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 20px' }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: TEXT, marginBottom: 6 }}>Welcome back</h1>
         <p style={{ fontSize: 13, color: MUTED, marginBottom: 28 }}>Jump into any tool.</p>
