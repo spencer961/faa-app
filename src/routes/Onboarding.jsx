@@ -2,10 +2,39 @@ import { useState } from 'react'
 import { NAVY, GOLD, BG, BORDER, TEXT, MUTED, INP, CARD, BTNP, BTNS } from '../lib/theme.js'
 import { DSEC } from '../lib/onboardingSections.js'
 import { SUPABASE_URL, SB_HEADERS } from '../lib/supabase.js'
+import { useAuth } from '../lib/AuthContext.jsx'
 
 // Public intake form for prospects. Migrated from onboarding.html — same
 // behavior, but now sharing the theme, the questions, and the DB connection
 // with the rest of the app instead of its own private copies.
+// Staff-only banner to grab the shareable link. Prospects (logged out) never
+// see it — the form below is what they get.
+function ShareBar() {
+  const { user } = useAuth()
+  const [copied, setCopied] = useState(false)
+  if (!user) return null
+  const link = window.location.origin + window.location.pathname + '#/onboarding'
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(link) } catch { const t = document.createElement('textarea'); t.value = link; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove() }
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(11,29,94,0.05)', border: '0.5px solid rgba(11,29,94,0.15)', borderRadius: 12, padding: '12px 14px', marginBottom: 24, flexWrap: 'wrap' }}>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: NAVY, marginBottom: 2 }}>Share this form with prospects</div>
+        <div style={{ fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</div>
+      </div>
+      <button onClick={copy} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: copied ? '#18a866' : NAVY, color: copied ? '#fff' : GOLD, border: 'none', borderRadius: 8, padding: '9px 15px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+        {copied ? (
+          <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg> Copied</>
+        ) : (
+          <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg> Copy link</>
+        )}
+      </button>
+    </div>
+  )
+}
+
 export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [ans, setAns] = useState({})
@@ -99,6 +128,7 @@ export default function Onboarding() {
         <div style={{ height: '100%', width: ((step + 1) / DSEC.length) * 100 + '%', background: GOLD, transition: 'width 0.4s' }} />
       </div>
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '36px 20px 80px' }}>
+        <ShareBar />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {DSEC.map((_, i) => (
