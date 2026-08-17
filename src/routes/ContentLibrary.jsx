@@ -112,6 +112,8 @@ export default function ContentLibrary() {
   const pillarGroups = [...PILLARS, { id: '__none', name: 'No pillar', color: '#9a9a96' }]
     .map((p) => ({ p, list: typed.filter((it) => (p.id === '__none' ? !it.pillar : it.pillar === p.id)) }))
     .filter((g) => g.list.length)
+  const allOpen = pillarGroups.length > 0 && pillarGroups.every((g) => openPillars[g.p.id])
+  const setAllPillars = (open) => { const next = {}; if (open) pillarGroups.forEach((g) => { next[g.p.id] = true }); setOpenPillars(next) }
 
   const renderItem = (it) => (
     <div key={it.id} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px' }}>
@@ -189,27 +191,38 @@ export default function ContentLibrary() {
           </div>
         </div>
 
-        {/* View + type controls */}
+        {/* Toolbar — display options grouped and labeled, then the filter pills */}
         {items.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-            <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
-              {[['grid', 'Grid'], ['list', 'List']].map(([v, l]) => <button key={v} onClick={() => setView(v)} style={seg(view === v)}>{l}</button>)}
+          <div style={{ ...CARD, padding: '12px 15px', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+              <div style={ctlGroup}>
+                <span style={ctlLabel}>View</span>
+                <div style={track}>
+                  <button onClick={() => setView('grid')} title="Grid view" style={segIcon(view === 'grid')}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.6" /><rect x="13" y="3" width="8" height="8" rx="1.6" /><rect x="3" y="13" width="8" height="8" rx="1.6" /><rect x="13" y="13" width="8" height="8" rx="1.6" /></svg>
+                  </button>
+                  <button onClick={() => setView('list')} title="List view" style={segIcon(view === 'list')}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
+                  </button>
+                </div>
+              </div>
+              <div style={ctlGroup}>
+                <span style={ctlLabel}>Show</span>
+                <div style={track}>
+                  {[['all', 'All'], ['video', 'Videos'], ['guide', 'Guides']].map(([v, l]) => <button key={v} onClick={() => setTypeFilter(v)} style={seg(typeFilter === v)}>{l}</button>)}
+                </div>
+              </div>
+              <div style={ctlGroup}>
+                <span style={ctlLabel}>Group by</span>
+                <div style={track}>
+                  {[['pillar', 'Pillar'], ['role', 'Role']].map(([v, l]) => (
+                    <button key={v} onClick={() => { setFilterMode(v); setFilter('all') }} style={seg(filterMode === v)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              {groupByPillar && <button onClick={() => setAllPillars(!allOpen)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 2px' }}>{allOpen ? 'Collapse all' : 'Expand all'}</button>}
             </div>
-            <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
-              {[['all', 'All'], ['video', 'Videos'], ['guide', 'Guides']].map(([v, l]) => <button key={v} onClick={() => setTypeFilter(v)} style={seg(typeFilter === v)}>{l}</button>)}
-            </div>
-          </div>
-        )}
-
-        {/* Filter — by pillar (topic) or by role (audience) */}
-        {items.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-            <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
-              {[['pillar', 'By pillar'], ['role', 'By role']].map(([v, l]) => (
-                <button key={v} onClick={() => { setFilterMode(v); setFilter('all') }} style={seg(filterMode === v)}>{l}</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '0.5px solid rgba(0,0,0,0.08)' }}>
               <button onClick={() => setFilter('all')} style={fpill(filter === 'all')}>All ({typed.length})</button>
               {(filterMode === 'pillar' ? PILLARS : ROLES).map((o) => { const n = typed.filter((it) => filterMode === 'pillar' ? it.pillar === o.id : (it.roles || []).includes(o.id)).length; return <button key={o.id} onClick={() => setFilter(o.id)} style={fpill(filter === o.id)}>{o.name} ({n})</button> })}
             </div>
@@ -220,16 +233,16 @@ export default function ContentLibrary() {
         {loading ? <div style={{ textAlign: 'center', color: MUTED, padding: 40, fontStyle: 'italic' }}>Loading…</div>
           : items.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>No content yet — add your first video or guide.</div>
             : groupByPillar ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                {pillarGroups.map(({ p, list }) => { const open = view === 'grid' || openPillars[p.id]; return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {pillarGroups.map(({ p, list }) => { const open = !!openPillars[p.id]; return (
                   <div key={p.id}>
-                    <div onClick={view === 'list' ? () => togglePillar(p.id) : undefined} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: view === 'list' ? 'pointer' : 'default', padding: view === 'list' ? '12px 15px' : '0', background: view === 'list' ? '#fff' : 'transparent', border: view === 'list' ? '0.5px solid rgba(0,0,0,0.1)' : 'none', borderRadius: 10, marginBottom: view === 'grid' ? 12 : 0 }}>
-                      {view === 'list' && <span style={{ color: MUTED, fontSize: 13, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>}
+                    <div onClick={() => togglePillar(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '11px 15px', background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10 }}>
+                      <span style={{ color: MUTED, fontSize: 12, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
                       <span style={{ width: 11, height: 11, borderRadius: 4, background: p.color, flexShrink: 0 }} />
                       <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>{p.name}</span>
                       <span style={{ fontSize: 12, color: MUTED }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
                     </div>
-                    {open && (view === 'grid' ? gridWrap(list) : <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10, paddingLeft: 12 }}>{list.map(renderItem)}</div>)}
+                    {open && <div style={{ marginTop: 12 }}>{view === 'grid' ? gridWrap(list) : <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingLeft: 12 }}>{list.map(renderItem)}</div>}</div>}
                   </div>
                 ) })}
               </div>
@@ -311,3 +324,7 @@ function Field({ label, children }) {
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 3000 }
 const fpill = (on) => ({ padding: '5px 12px', borderRadius: 999, border: '0.5px solid ' + (on ? NAVY : 'rgba(0,0,0,0.15)'), background: on ? NAVY : '#fff', color: on ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' })
 const seg = (on) => ({ padding: '5px 13px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' })
+const segIcon = (on) => ({ ...seg(on), padding: '5px 9px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' })
+const track = { display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }
+const ctlGroup = { display: 'inline-flex', alignItems: 'center', gap: 8 }
+const ctlLabel = { fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: MUTED }
