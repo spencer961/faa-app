@@ -13,6 +13,8 @@ import { uid, CAT_PALETTE, GUIDES_BUCKET, PILLARS, ROLES, pillarById, roleById, 
 // ─────────────────────────────────────────────────────────────────────
 
 const STATE_ID = 'gmj_main'
+// Module-level guard so React 18 StrictMode's double-effect can't double-seed.
+let seedGuard = false
 
 export default function ContentLibrary() {
   const [appData, setAppData] = useState({})
@@ -21,6 +23,7 @@ export default function ContentLibrary() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [filterMode, setFilterMode] = useState('pillar') // 'pillar' | 'role'
+  const [openPillars, setOpenPillars] = useState({}) // {pillarId: true} when expanded
   const [editing, setEditing] = useState(null) // item, {} for new, or null
   const [newCat, setNewCat] = useState('')
 
@@ -30,7 +33,8 @@ export default function ContentLibrary() {
       let d = st?.data || {}
       // One-time seed of placeholder content so the library is populated to
       // visualise. Real rows — editable/deletable. A marker stops it re-seeding.
-      if (!d.contentSeeded) {
+      if (!d.contentSeeded && !seedGuard) {
+        seedGuard = true
         const now = Date.now()
         const rows = SEED_ITEMS.map((s, i) => ({ type: s.type, title: s.title, description: s.description, url: s.url, file_path: null, pillar: s.pillar, roles: s.roles, categories: [], created_at: new Date(now + i).toISOString(), updated_at: new Date(now + i).toISOString() }))
         const { error } = await supabase.from('content_items').insert(rows)
@@ -100,6 +104,35 @@ export default function ContentLibrary() {
   }
 
   const shown = filter === 'all' ? items : items.filter((it) => filterMode === 'pillar' ? it.pillar === filter : (it.roles || []).includes(filter))
+  const togglePillar = (id) => setOpenPillars((o) => ({ ...o, [id]: !o[id] }))
+  const groupByPillar = filterMode === 'pillar' && filter === 'all'
+  const pillarGroups = [...PILLARS, { id: '__none', name: 'No pillar', color: '#9a9a96' }]
+    .map((p) => ({ p, list: items.filter((it) => (p.id === '__none' ? !it.pillar : it.pillar === p.id)) }))
+    .filter((g) => g.list.length)
+
+  const renderItem = (it) => (
+    <div key={it.id} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px' }}>
+      <div style={{ width: 38, height: 38, borderRadius: 9, background: it.type === 'video' ? 'rgba(24,127,212,0.12)' : 'rgba(188,151,98,0.16)', color: it.type === 'video' ? '#185fa5' : '#8a6a3c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {it.type === 'video'
+          ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M10 9l5 3-5 3V9z" /></svg>
+          : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 600, color: TEXT }}>{it.title}</div>
+        {it.description && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.description}</div>}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+          {(() => { const p = pillarById(it.pillar); return p ? <span style={{ fontSize: 10.5, color: '#fff', background: p.color, borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>{p.name}</span> : <span style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic' }}>no pillar</span> })()}
+          {(it.roles || []).map((rid) => { const r = roleById(rid); return r ? <span key={rid} style={{ fontSize: 10.5, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 20, padding: '1px 8px' }}>{r.name}</span> : null })}
+          {(it.categories || []).map((cid) => { const c = catById(cid); return c ? <span key={cid} style={{ fontSize: 10.5, color: '#fff', background: c.color, borderRadius: 20, padding: '1px 8px' }}>{c.name}</span> : null })}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <button onClick={() => openItem(it)} style={{ ...BTNS, padding: '6px 12px', fontSize: 12 }}>Open ↗</button>
+        <button onClick={() => setEditing(it)} style={{ ...BTNS, padding: '6px 12px', fontSize: 12 }}>Edit</button>
+        <button onClick={() => deleteItem(it)} title="Delete" style={{ ...BTNS, padding: '6px 10px', fontSize: 12, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)' }}>×</button>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
@@ -141,36 +174,25 @@ export default function ContentLibrary() {
           </div>
         )}
 
-        {/* Items */}
+        {/* Items — grouped + collapsible by pillar when viewing all pillars, else a flat list */}
         {loading ? <div style={{ textAlign: 'center', color: MUTED, padding: 40, fontStyle: 'italic' }}>Loading…</div>
-          : shown.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>{items.length ? 'Nothing in this category yet.' : 'No content yet — add your first video or guide.'}</div>
-            : (
+          : items.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>No content yet — add your first video or guide.</div>
+            : groupByPillar ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {shown.map((it) => (
-                  <div key={it.id} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px' }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 9, background: it.type === 'video' ? 'rgba(24,127,212,0.12)' : 'rgba(188,151,98,0.16)', color: it.type === 'video' ? '#185fa5' : '#8a6a3c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {it.type === 'video'
-                        ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M10 9l5 3-5 3V9z" /></svg>
-                        : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>}
+                {pillarGroups.map(({ p, list }) => { const open = openPillars[p.id]; return (
+                  <div key={p.id}>
+                    <div onClick={() => togglePillar(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '12px 15px', background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10 }}>
+                      <span style={{ color: MUTED, fontSize: 13, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
+                      <span style={{ width: 11, height: 11, borderRadius: 4, background: p.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>{p.name}</span>
+                      <span style={{ fontSize: 12, color: MUTED }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14.5, fontWeight: 600, color: TEXT }}>{it.title}</div>
-                      {it.description && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.description}</div>}
-                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-                        {(() => { const p = pillarById(it.pillar); return p ? <span style={{ fontSize: 10.5, color: '#fff', background: p.color, borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>{p.name}</span> : <span style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic' }}>no pillar</span> })()}
-                        {(it.roles || []).map((rid) => { const r = roleById(rid); return r ? <span key={rid} style={{ fontSize: 10.5, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 20, padding: '1px 8px' }}>{r.name}</span> : null })}
-                        {(it.categories || []).map((cid) => { const c = catById(cid); return c ? <span key={cid} style={{ fontSize: 10.5, color: '#fff', background: c.color, borderRadius: 20, padding: '1px 8px' }}>{c.name}</span> : null })}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      <button onClick={() => openItem(it)} style={{ ...BTNS, padding: '6px 12px', fontSize: 12 }}>Open ↗</button>
-                      <button onClick={() => setEditing(it)} style={{ ...BTNS, padding: '6px 12px', fontSize: 12 }}>Edit</button>
-                      <button onClick={() => deleteItem(it)} title="Delete" style={{ ...BTNS, padding: '6px 10px', fontSize: 12, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)' }}>×</button>
-                    </div>
+                    {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10, paddingLeft: 12 }}>{list.map(renderItem)}</div>}
                   </div>
-                ))}
+                ) })}
               </div>
-            )}
+            ) : shown.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>Nothing here yet.</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{shown.map(renderItem)}</div>}
       </div>
 
       {editing && <ItemModal item={editing} cats={cats} onClose={() => setEditing(null)} onSave={upsertItem} />}
