@@ -67,7 +67,8 @@
       "Bash(git commit -q -m 'Content library: pillars + roles + auto-seeded placeholders *)",
       "Bash(git commit -q -m 'Sitewide: confirm before every delete *)",
       "Bash(git commit -q -m 'Content library: Grid/List view toggle + video/guide filter *)",
-      "Bash(git commit -q -m 'Content library: cleaner grouped toolbar + collapsible grid sections + expand/collapse all *)"
+      "Bash(git commit -q -m 'Content library: cleaner grouped toolbar + collapsible grid sections + expand/collapse all *)",
+      "Bash(git commit -q -m 'Content library: label manager \\(inline pillar/team/package pickers\\) + category color editing *)"
     ]
   }
 }

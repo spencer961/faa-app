@@ -50,12 +50,14 @@ export default function ContentLibrary() {
     })()
   }, [])
 
-  const saveCats = async (next) => {
-    setCats(next)
+  const persistCats = async (next) => {
     const data = { ...appData, contentCategories: next }
     setAppData(data)
     await supabase.from('app_state').upsert({ id: STATE_ID, data, updated_at: new Date().toISOString() })
   }
+  const saveCats = async (next) => { setCats(next); await persistCats(next) }
+  // Live-update a category color while the picker is open; persist on close (blur).
+  const setCatColor = (id, color, persist) => { const next = cats.map((x) => (x.id === id ? { ...x, color } : x)); setCats(next); if (persist) persistCats(next) }
   const addCat = () => {
     const name = newCat.trim(); if (!name) return
     saveCats([...cats, { id: uid(), name, color: CAT_PALETTE[cats.length % CAT_PALETTE.length] }])
@@ -103,6 +105,11 @@ export default function ContentLibrary() {
     } else if (it.url) {
       window.open(it.url, '_blank', 'noopener')
     }
+  }
+  // Inline label edit from the label-manager view — patch one field & persist.
+  const patchItem = async (it, patch) => {
+    setItems((is) => is.map((x) => (x.id === it.id ? { ...x, ...patch } : x)))
+    await supabase.from('content_items').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', it.id)
   }
 
   const typed = typeFilter === 'all' ? items : items.filter((it) => it.type === typeFilter)
@@ -166,6 +173,43 @@ export default function ContentLibrary() {
   }
   const gridWrap = (list) => <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 16 }}>{list.map(renderCard)}</div>
 
+  // Label-manager row: thumbnail + name + description on the left; pillar / team
+  // / package pickers on the right. Every change saves inline (patchItem).
+  const renderManageRow = (it) => {
+    const p = pillarById(it.pillar)
+    return (
+      <div key={it.id} style={{ ...CARD, display: 'flex', gap: 14, padding: '12px 14px', alignItems: 'flex-start' }}>
+        <div onClick={() => openItem(it)} title="Open" style={{ width: 66, height: 50, borderRadius: 8, background: p ? p.color : '#9a9a96', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
+          {it.type === 'video'
+            ? <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="11" height="11" viewBox="0 0 24 24" fill="#1c1c1a" style={{ marginLeft: 2 }}><path d="M8 5v14l11-7z" /></svg></span>
+            : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h6" /></svg>}
+        </div>
+        <div style={{ width: 210, flexShrink: 0, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: TEXT }}>{it.title} <span style={{ fontSize: 11, color: MUTED, fontWeight: 500 }}>· {it.type === 'video' ? 'Video' : 'Guide'}</span></div>
+          {it.description && <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{it.description}</div>}
+          <button onClick={() => setEditing(it)} style={{ background: 'none', border: 'none', color: NAVY, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0 0' }}>Edit details</button>
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <LabelRow label="Pillar">
+            <select value={it.pillar || ''} onChange={(e) => patchItem(it, { pillar: e.target.value || null })} style={SELECT}>
+              <option value="">— none —</option>
+              {PILLARS.map((pp) => <option key={pp.id} value={pp.id}>{pp.name}</option>)}
+            </select>
+          </LabelRow>
+          <LabelRow label="Team">
+            <ChipAdder options={ROLES} selected={it.roles || []} nameOf={(id) => roleById(id)?.name} color="#0f6e56"
+              onAdd={(id) => patchItem(it, { roles: [...(it.roles || []), id] })} onRemove={(id) => patchItem(it, { roles: (it.roles || []).filter((x) => x !== id) })} />
+          </LabelRow>
+          <LabelRow label="Packages">
+            <ChipAdder options={cats} selected={it.categories || []} nameOf={(id) => catById(id)?.name} colorOf={(id) => catById(id)?.color}
+              onAdd={(id) => patchItem(it, { categories: [...(it.categories || []), id] })} onRemove={(id) => patchItem(it, { categories: (it.categories || []).filter((x) => x !== id) })}
+              empty="No packages yet — add them above." />
+          </LabelRow>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Content Library" right={<><button onClick={() => setEditing({ type: 'video' })} style={{ ...BTNS, height: 32, padding: '0 13px', fontSize: 12.5 }}>+ Video</button><button onClick={() => setEditing({ type: 'guide' })} style={{ ...BTNP, height: 32, padding: '0 14px', fontSize: 12.5 }}>+ Guide</button></>} />
@@ -177,8 +221,8 @@ export default function ContentLibrary() {
           <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>Tag each video or guide with one or more categories. Later you’ll bundle categories into packages and tiers.</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             {cats.map((c) => (
-              <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', border: '0.5px solid rgba(0,0,0,0.14)', borderRadius: 999, padding: '5px 6px 5px 11px', fontSize: 12.5 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: c.color, flexShrink: 0 }} />
+              <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', border: '0.5px solid rgba(0,0,0,0.14)', borderRadius: 999, padding: '5px 6px 5px 7px', fontSize: 12.5 }}>
+                <input type="color" value={c.color} title="Change color" onChange={(e) => setCatColor(c.id, e.target.value, false)} onBlur={(e) => setCatColor(c.id, e.target.value, true)} style={{ width: 16, height: 16, padding: 0, border: 'none', background: 'none', cursor: 'pointer', borderRadius: '50%' }} />
                 <span onClick={() => renameCat(c.id)} title="Rename" style={{ cursor: 'pointer', color: TEXT }}>{c.name}</span>
                 <button onClick={() => deleteCat(c.id)} title="Delete category" style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 2px' }}>×</button>
               </span>
@@ -204,6 +248,9 @@ export default function ContentLibrary() {
                   <button onClick={() => setView('list')} title="List view" style={segIcon(view === 'list')}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
                   </button>
+                  <button onClick={() => setView('manage')} title="Label manager — set pillar, team & packages inline" style={segIcon(view === 'manage')}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="7" x2="20" y2="7" /><circle cx="15" cy="7" r="2.4" fill="currentColor" /><line x1="4" y1="17" x2="20" y2="17" /><circle cx="9" cy="17" r="2.4" fill="currentColor" /></svg>
+                  </button>
                 </div>
               </div>
               <div style={ctlGroup}>
@@ -220,7 +267,7 @@ export default function ContentLibrary() {
                   ))}
                 </div>
               </div>
-              {groupByPillar && <button onClick={() => setAllPillars(!allOpen)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 2px' }}>{allOpen ? 'Collapse all' : 'Expand all'}</button>}
+              {groupByPillar && view !== 'manage' && <button onClick={() => setAllPillars(!allOpen)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 2px' }}>{allOpen ? 'Collapse all' : 'Expand all'}</button>}
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '0.5px solid rgba(0,0,0,0.08)' }}>
               <button onClick={() => setFilter('all')} style={fpill(filter === 'all')}>All ({typed.length})</button>
@@ -232,7 +279,13 @@ export default function ContentLibrary() {
         {/* Items — Grid (thumbnails) or List; grouped by pillar when viewing all pillars */}
         {loading ? <div style={{ textAlign: 'center', color: MUTED, padding: 40, fontStyle: 'italic' }}>Loading…</div>
           : items.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>No content yet — add your first video or guide.</div>
-            : groupByPillar ? (
+            : view === 'manage' ? (
+              shown.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>Nothing here yet.</div>
+                : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: MUTED, marginBottom: 2 }}>Set the <b style={{ color: TEXT }}>pillar</b>, <b style={{ color: TEXT }}>team</b> and <b style={{ color: TEXT }}>packages</b> for each item — changes save automatically.</div>
+                    {shown.map(renderManageRow)}
+                  </div>
+            ) : groupByPillar ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {pillarGroups.map(({ p, list }) => { const open = !!openPillars[p.id]; return (
                   <div key={p.id}>
@@ -317,6 +370,37 @@ function ItemModal({ item, cats, onClose, onSave }) {
   )
 }
 
+// One labeled control line in the label-manager row.
+function LabelRow({ label, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <span style={{ width: 62, flexShrink: 0, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: MUTED, paddingTop: 6 }}>{label}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+    </div>
+  )
+}
+
+// Selected labels as removable chips + a dropdown to add more (many-to-many).
+function ChipAdder({ options, selected, nameOf, colorOf, color, onAdd, onRemove, empty }) {
+  const avail = options.filter((o) => !selected.includes(o.id))
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', minHeight: 26 }}>
+      {selected.map((id) => {
+        const bg = colorOf ? (colorOf(id) || '#777') : (color || '#777')
+        return (
+          <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#fff', background: bg, borderRadius: 20, padding: '2px 4px 2px 9px' }}>
+            {nameOf(id) || '—'}
+            <button onClick={() => onRemove(id)} title="Remove" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+          </span>
+        )
+      })}
+      {avail.length > 0
+        ? <select value="" onChange={(e) => { if (e.target.value) onAdd(e.target.value) }} style={MINISELECT}><option value="">＋ add</option>{avail.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
+        : selected.length === 0 && <span style={{ fontSize: 11, color: MUTED, fontStyle: 'italic' }}>{empty || 'none'}</span>}
+    </div>
+  )
+}
+
 function Field({ label, children }) {
   return <div style={{ marginBottom: 12 }}><div style={{ fontSize: 11.5, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5 }}>{label}</div>{children}</div>
 }
@@ -328,3 +412,5 @@ const segIcon = (on) => ({ ...seg(on), padding: '5px 9px', display: 'inline-flex
 const track = { display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }
 const ctlGroup = { display: 'inline-flex', alignItems: 'center', gap: 8 }
 const ctlLabel = { fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: MUTED }
+const SELECT = { width: '100%', maxWidth: 220, height: 30, borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.18)', background: '#fff', color: TEXT, fontSize: 12.5, fontFamily: 'inherit', padding: '0 8px', cursor: 'pointer' }
+const MINISELECT = { height: 24, borderRadius: 20, border: '0.5px dashed rgba(0,0,0,0.3)', background: '#fff', color: MUTED, fontSize: 11, fontFamily: 'inherit', padding: '0 6px', cursor: 'pointer' }
