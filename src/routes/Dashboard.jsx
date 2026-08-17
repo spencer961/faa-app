@@ -473,7 +473,7 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
                   {cvis.length === 0 && <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic', padding: '2px 0' }}>{activePrac ? 'No files for this location' : 'No files yet'}</div>}
                   <div style={cvis.length > 7 ? { display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 236, overflowY: 'auto' } : { display: 'contents' }}>
-                    {cvis.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); deleteLink(l.id) }} />)}
+                    {cvis.map((l) => <LinkChip key={l.id} l={l} clientName={c.name} editMode={editMode} onEdit={(e) => { e.stopPropagation(); setLinkModal({ id: l.id, clientId: c.id }) }} onDelete={(e) => { e.stopPropagation(); if (window.confirm('Delete the “' + l.label + '” link?')) deleteLink(l.id) }} />)}
                   </div>
                   {editMode && <button onClick={(e) => { e.stopPropagation(); setLinkModal({ clientId: c.id, practice: activePrac || '' }) }} style={addRow}>+ Add link</button>}
                 </div>
@@ -1011,7 +1011,7 @@ function LinkModal({ modal, link, clients, onSave, onDelete, onClose }) {
           </Field>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)', paddingTop: 14 }}>
-          {link && <button onClick={() => onDelete(link.id)} style={{ ...btnGhost, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)', marginRight: 'auto' }}>Delete</button>}
+          {link && <button onClick={() => { if (window.confirm('Delete this link? This can’t be undone.')) onDelete(link.id) }} style={{ ...btnGhost, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)', marginRight: 'auto' }}>Delete</button>}
           <button onClick={onClose} style={btnGhost}>Cancel</button>
           <button onClick={() => onSave(form)} style={btnPrimary}>Save</button>
         </div>

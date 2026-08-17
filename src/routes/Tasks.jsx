@@ -244,7 +244,7 @@ function TaskModal({ task, clients, onClose, onSave, onDelete }) {
           <textarea className="fi" value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Additional context…" />
         </div>
         <div className="ma">
-          {task.id && <button className="md" onClick={() => onDelete(task.id)}>Delete</button>}
+          {task.id && <button className="md" onClick={() => { if (window.confirm('Delete this task? This can’t be undone.')) onDelete(task.id) }}>Delete</button>}
           <button className="mc" onClick={onClose}>Cancel</button>
           <button className="ms" onClick={() => onSave(form)}>Save task</button>
         </div>

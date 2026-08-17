@@ -368,7 +368,7 @@ function ItemRow({ it, doneKey, hasLink, canEdit, onToggle, onReply, onRemove })
               ? <a href={it.url} target="_blank" rel="noopener" style={{ fontSize: 14, color: NAVY, fontWeight: 500, textDecoration: done ? 'line-through' : 'none' }}>{it.title} ↗</a>
               : <span style={{ fontSize: 14, color: TEXT, textDecoration: done ? 'line-through' : 'none' }}>{it.title}</span>}
             {it.kind && <span style={{ fontSize: 10, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 4, padding: '0 6px' }}>{it.kind}</span>}
-            {canEdit && <button onClick={onRemove} title="Remove" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>}
+            {canEdit && <button onClick={() => { if (window.confirm('Remove “' + it.title + '”?')) onRemove() }} title="Remove" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>}
           </div>
           {it.note && <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginTop: 4 }}><span style={{ color: '#a0a09e' }}>assistant:</span> {it.note}</div>}
           {!hasLink && it.url && <a href={it.url} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: NAVY, fontWeight: 500, marginTop: 6, textDecoration: 'none' }}>View email thread ↗</a>}

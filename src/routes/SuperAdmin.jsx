@@ -103,7 +103,7 @@ export default function SuperAdmin() {
                 <input type="color" value={t.color} onChange={(e) => editTier(t.id, { color: e.target.value })} style={{ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }} />
                 <input defaultValue={t.name} onBlur={(e) => e.target.value.trim() && editTier(t.id, { name: e.target.value.trim() })} style={{ flex: 1, height: 32, border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 6, padding: '0 10px', fontSize: 13, background: '#fff', fontFamily: 'inherit' }} />
                 <span style={{ fontSize: 11, color: MUTED, fontFamily: 'monospace' }}>{t.id}</span>
-                <button onClick={() => deleteTier(t.id)} title="Delete tier" style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>×</button>
+                <button onClick={() => { if (window.confirm('Delete the “' + t.name + '” tier?')) deleteTier(t.id) }} title="Delete tier" style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>×</button>
               </div>
             ))}
           </div>

@@ -63,7 +63,9 @@
       "Bash(git commit -q -m 'Client Pulse: condense filter into gear menu, eye icon-only + mode color *)",
       "Bash(git commit -q -m 'Client Pulse: surface my to-dos on the client desk *)",
       "Bash(git commit -q -m 'Dashboard: open a card'\\\\''s review desk in a new tab *)",
-      "Bash(git commit -q -m 'Client Pulse: Heads up on top, log un-checks too *)"
+      "Bash(git commit -q -m 'Client Pulse: Heads up on top, log un-checks too *)",
+      "Bash(git commit -q -m 'Content library: pillars + roles + auto-seeded placeholders *)",
+      "Bash(git commit -q -m 'Sitewide: confirm before every delete *)"
     ]
   }
 }
