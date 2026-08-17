@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Header from '../components/Header.jsx'
 import { NAVY, GOLD, BG, TEXT, MUTED, CARD, INP, BTNP, BTNS } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
-import { uid, CAT_PALETTE, GUIDES_BUCKET } from '../lib/content.js'
+import { uid, CAT_PALETTE, GUIDES_BUCKET, PILLARS, ROLES, pillarById, roleById, SEED_ITEMS } from '../lib/content.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Content Library (admin) — where videos + guides live. Videos are external
@@ -20,13 +20,22 @@ export default function ContentLibrary() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [filterMode, setFilterMode] = useState('pillar') // 'pillar' | 'role'
   const [editing, setEditing] = useState(null) // item, {} for new, or null
   const [newCat, setNewCat] = useState('')
 
   useEffect(() => {
     ;(async () => {
       const { data: st } = await supabase.from('app_state').select('data').eq('id', STATE_ID).maybeSingle()
-      const d = st?.data || {}
+      let d = st?.data || {}
+      // One-time seed of placeholder content so the library is populated to
+      // visualise. Real rows — editable/deletable. A marker stops it re-seeding.
+      if (!d.contentSeeded) {
+        const now = Date.now()
+        const rows = SEED_ITEMS.map((s, i) => ({ type: s.type, title: s.title, description: s.description, url: s.url, file_path: null, pillar: s.pillar, roles: s.roles, categories: [], created_at: new Date(now + i).toISOString(), updated_at: new Date(now + i).toISOString() }))
+        const { error } = await supabase.from('content_items').insert(rows)
+        if (!error) { d = { ...d, contentSeeded: true }; await supabase.from('app_state').upsert({ id: STATE_ID, data: d, updated_at: new Date().toISOString() }) }
+      }
       setAppData(d)
       setCats(Array.isArray(d.contentCategories) ? d.contentCategories : [])
       const { data: its } = await supabase.from('content_items').select('*').order('created_at', { ascending: false })
@@ -64,7 +73,7 @@ export default function ContentLibrary() {
       if (error) { alert('Upload failed: ' + error.message); return false }
       file_path = path
     }
-    const payload = { type: row.type, title: row.title, description: row.description || null, url: row.url || null, file_path, categories: row.categories || [], updated_at: new Date().toISOString() }
+    const payload = { type: row.type, title: row.title, description: row.description || null, url: row.url || null, file_path, pillar: row.pillar || null, roles: row.roles || [], categories: row.categories || [], updated_at: new Date().toISOString() }
     if (row.id) {
       await supabase.from('content_items').update(payload).eq('id', row.id)
       setItems((is) => is.map((it) => (it.id === row.id ? { ...it, ...payload } : it)))
@@ -90,7 +99,7 @@ export default function ContentLibrary() {
     }
   }
 
-  const shown = filter === 'all' ? items : items.filter((it) => (it.categories || []).includes(filter))
+  const shown = filter === 'all' ? items : items.filter((it) => filterMode === 'pillar' ? it.pillar === filter : (it.roles || []).includes(filter))
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
@@ -117,11 +126,18 @@ export default function ContentLibrary() {
           </div>
         </div>
 
-        {/* Filter */}
-        {cats.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-            <button onClick={() => setFilter('all')} style={fpill(filter === 'all')}>All ({items.length})</button>
-            {cats.map((c) => { const n = items.filter((it) => (it.categories || []).includes(c.id)).length; return <button key={c.id} onClick={() => setFilter(c.id)} style={fpill(filter === c.id)}>{c.name} ({n})</button> })}
+        {/* Filter — by pillar (topic) or by role (audience) */}
+        {items.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+              {[['pillar', 'By pillar'], ['role', 'By role']].map(([v, l]) => (
+                <button key={v} onClick={() => { setFilterMode(v); setFilter('all') }} style={seg(filterMode === v)}>{l}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button onClick={() => setFilter('all')} style={fpill(filter === 'all')}>All ({items.length})</button>
+              {(filterMode === 'pillar' ? PILLARS : ROLES).map((o) => { const n = items.filter((it) => filterMode === 'pillar' ? it.pillar === o.id : (it.roles || []).includes(o.id)).length; return <button key={o.id} onClick={() => setFilter(o.id)} style={fpill(filter === o.id)}>{o.name} ({n})</button> })}
+            </div>
           </div>
         )}
 
@@ -140,9 +156,10 @@ export default function ContentLibrary() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14.5, fontWeight: 600, color: TEXT }}>{it.title}</div>
                       {it.description && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.description}</div>}
-                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+                        {(() => { const p = pillarById(it.pillar); return p ? <span style={{ fontSize: 10.5, color: '#fff', background: p.color, borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>{p.name}</span> : <span style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic' }}>no pillar</span> })()}
+                        {(it.roles || []).map((rid) => { const r = roleById(rid); return r ? <span key={rid} style={{ fontSize: 10.5, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 20, padding: '1px 8px' }}>{r.name}</span> : null })}
                         {(it.categories || []).map((cid) => { const c = catById(cid); return c ? <span key={cid} style={{ fontSize: 10.5, color: '#fff', background: c.color, borderRadius: 20, padding: '1px 8px' }}>{c.name}</span> : null })}
-                        {(!it.categories || it.categories.length === 0) && <span style={{ fontSize: 11, color: MUTED, fontStyle: 'italic' }}>uncategorized</span>}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -162,11 +179,13 @@ export default function ContentLibrary() {
 }
 
 function ItemModal({ item, cats, onClose, onSave }) {
-  const [f, setF] = useState({ type: item.type || 'video', title: item.title || '', description: item.description || '', url: item.url || '', categories: item.categories || [], id: item.id, file_path: item.file_path || null })
+  const [f, setF] = useState({ type: item.type || 'video', title: item.title || '', description: item.description || '', url: item.url || '', pillar: item.pillar || '', roles: item.roles || [], categories: item.categories || [], id: item.id, file_path: item.file_path || null })
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
   const toggleCat = (id) => set('categories', f.categories.includes(id) ? f.categories.filter((x) => x !== id) : [...f.categories, id])
+  const toggleRole = (id) => set('roles', f.roles.includes(id) ? f.roles.filter((x) => x !== id) : [...f.roles, id])
+  const chip = (on, color) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 999, border: '0.5px solid ' + (on ? (color || NAVY) : 'rgba(0,0,0,0.15)'), background: on ? (color || NAVY) : '#fff', color: on ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' })
   const submit = async () => {
     if (!f.title.trim()) return alert('Give it a title.')
     if (f.type === 'video' && !f.url.trim()) return alert('Paste the video link.')
@@ -194,7 +213,16 @@ function ItemModal({ item, cats, onClose, onSave }) {
             {f.file_path && !file && <div style={{ fontSize: 11.5, color: MUTED, marginTop: -8, marginBottom: 12 }}>Current file kept unless you choose a new one.</div>}
             <Field label="…or a link instead (optional)"><input value={f.url} onChange={(e) => set('url', e.target.value)} placeholder="https://drive.google.com/…" style={INP} /></Field>
           </>}
-        <div style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: '4px 0 7px' }}>Categories</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: '4px 0 7px' }}>Pillar</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+          {PILLARS.map((p) => { const on = f.pillar === p.id; return <button key={p.id} onClick={() => set('pillar', on ? '' : p.id)} style={chip(on, p.color)}>{on && <span style={{ fontSize: 11 }}>✓</span>}{p.name}</button> })}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: '4px 0 3px' }}>Intended for</div>
+        <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 7 }}>Which team roles this training is for (the owner always sees everything).</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+          {ROLES.map((r) => { const on = f.roles.includes(r.id); return <button key={r.id} onClick={() => toggleRole(r.id)} style={chip(on, '#0f6e56')}>{on && <span style={{ fontSize: 11 }}>✓</span>}{r.name}</button> })}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: '4px 0 7px' }}>Access packages (optional)</div>
         {cats.length === 0 ? <div style={{ fontSize: 12, color: MUTED, fontStyle: 'italic', marginBottom: 8 }}>Add a category first to tag this.</div>
           : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 8 }}>
             {cats.map((c) => { const on = f.categories.includes(c.id); return (
@@ -218,3 +246,4 @@ function Field({ label, children }) {
 
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 3000 }
 const fpill = (on) => ({ padding: '5px 12px', borderRadius: 999, border: '0.5px solid ' + (on ? NAVY : 'rgba(0,0,0,0.15)'), background: on ? NAVY : '#fff', color: on ? '#fff' : MUTED, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' })
+const seg = (on) => ({ padding: '5px 13px', borderRadius: 999, border: 'none', background: on ? '#fff' : 'transparent', color: on ? NAVY : MUTED, fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' })
