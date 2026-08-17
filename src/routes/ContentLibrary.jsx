@@ -24,6 +24,8 @@ export default function ContentLibrary() {
   const [filter, setFilter] = useState('all')
   const [filterMode, setFilterMode] = useState('pillar') // 'pillar' | 'role'
   const [openPillars, setOpenPillars] = useState({}) // {pillarId: true} when expanded
+  const [view, setView] = useState('grid') // 'grid' | 'list'
+  const [typeFilter, setTypeFilter] = useState('all') // 'all' | 'video' | 'guide'
   const [editing, setEditing] = useState(null) // item, {} for new, or null
   const [newCat, setNewCat] = useState('')
 
@@ -103,11 +105,12 @@ export default function ContentLibrary() {
     }
   }
 
-  const shown = filter === 'all' ? items : items.filter((it) => filterMode === 'pillar' ? it.pillar === filter : (it.roles || []).includes(filter))
+  const typed = typeFilter === 'all' ? items : items.filter((it) => it.type === typeFilter)
+  const shown = filter === 'all' ? typed : typed.filter((it) => filterMode === 'pillar' ? it.pillar === filter : (it.roles || []).includes(filter))
   const togglePillar = (id) => setOpenPillars((o) => ({ ...o, [id]: !o[id] }))
   const groupByPillar = filterMode === 'pillar' && filter === 'all'
   const pillarGroups = [...PILLARS, { id: '__none', name: 'No pillar', color: '#9a9a96' }]
-    .map((p) => ({ p, list: items.filter((it) => (p.id === '__none' ? !it.pillar : it.pillar === p.id)) }))
+    .map((p) => ({ p, list: typed.filter((it) => (p.id === '__none' ? !it.pillar : it.pillar === p.id)) }))
     .filter((g) => g.list.length)
 
   const renderItem = (it) => (
@@ -134,6 +137,33 @@ export default function ContentLibrary() {
     </div>
   )
 
+  // Thumbnail card for the grid view.
+  const renderCard = (it) => {
+    const p = pillarById(it.pillar)
+    return (
+      <div key={it.id} style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div onClick={() => openItem(it)} title="Open" style={{ height: 116, background: p ? p.color : '#9a9a96', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          {it.type === 'video'
+            ? <span style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.18)' }}><svg width="16" height="16" viewBox="0 0 24 24" fill="#1c1c1a" style={{ marginLeft: 3 }}><path d="M8 5v14l11-7z" /></svg></span>
+            : <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h6" /></svg>}
+        </div>
+        <div style={{ padding: '11px 13px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: TEXT }}>{it.title}</div>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+            {p && <span style={{ fontSize: 10.5, color: '#fff', background: p.color, borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>{p.name.split(' ')[0]}</span>}
+            <span style={{ fontSize: 10.5, color: MUTED }}>{it.type === 'video' ? 'Video' : 'Guide'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 11 }}>
+            <button onClick={() => openItem(it)} style={{ ...BTNS, padding: '5px 10px', fontSize: 11.5 }}>Open ↗</button>
+            <button onClick={() => setEditing(it)} style={{ ...BTNS, padding: '5px 10px', fontSize: 11.5 }}>Edit</button>
+            <button onClick={() => deleteItem(it)} title="Delete" style={{ ...BTNS, padding: '5px 9px', fontSize: 11.5, color: '#A32D2D', borderColor: 'rgba(163,45,45,0.3)', marginLeft: 'auto' }}>×</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  const gridWrap = (list) => <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 16 }}>{list.map(renderCard)}</div>
+
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Content Library" right={<><button onClick={() => setEditing({ type: 'video' })} style={{ ...BTNS, height: 32, padding: '0 13px', fontSize: 12.5 }}>+ Video</button><button onClick={() => setEditing({ type: 'guide' })} style={{ ...BTNP, height: 32, padding: '0 14px', fontSize: 12.5 }}>+ Guide</button></>} />
@@ -159,6 +189,18 @@ export default function ContentLibrary() {
           </div>
         </div>
 
+        {/* View + type controls */}
+        {items.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+              {[['grid', 'Grid'], ['list', 'List']].map(([v, l]) => <button key={v} onClick={() => setView(v)} style={seg(view === v)}>{l}</button>)}
+            </div>
+            <div style={{ display: 'inline-flex', gap: 3, background: '#eeece8', borderRadius: 999, padding: 3 }}>
+              {[['all', 'All'], ['video', 'Videos'], ['guide', 'Guides']].map(([v, l]) => <button key={v} onClick={() => setTypeFilter(v)} style={seg(typeFilter === v)}>{l}</button>)}
+            </div>
+          </div>
+        )}
+
         {/* Filter — by pillar (topic) or by role (audience) */}
         {items.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -168,31 +210,31 @@ export default function ContentLibrary() {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button onClick={() => setFilter('all')} style={fpill(filter === 'all')}>All ({items.length})</button>
-              {(filterMode === 'pillar' ? PILLARS : ROLES).map((o) => { const n = items.filter((it) => filterMode === 'pillar' ? it.pillar === o.id : (it.roles || []).includes(o.id)).length; return <button key={o.id} onClick={() => setFilter(o.id)} style={fpill(filter === o.id)}>{o.name} ({n})</button> })}
+              <button onClick={() => setFilter('all')} style={fpill(filter === 'all')}>All ({typed.length})</button>
+              {(filterMode === 'pillar' ? PILLARS : ROLES).map((o) => { const n = typed.filter((it) => filterMode === 'pillar' ? it.pillar === o.id : (it.roles || []).includes(o.id)).length; return <button key={o.id} onClick={() => setFilter(o.id)} style={fpill(filter === o.id)}>{o.name} ({n})</button> })}
             </div>
           </div>
         )}
 
-        {/* Items — grouped + collapsible by pillar when viewing all pillars, else a flat list */}
+        {/* Items — Grid (thumbnails) or List; grouped by pillar when viewing all pillars */}
         {loading ? <div style={{ textAlign: 'center', color: MUTED, padding: 40, fontStyle: 'italic' }}>Loading…</div>
           : items.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>No content yet — add your first video or guide.</div>
             : groupByPillar ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {pillarGroups.map(({ p, list }) => { const open = openPillars[p.id]; return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {pillarGroups.map(({ p, list }) => { const open = view === 'grid' || openPillars[p.id]; return (
                   <div key={p.id}>
-                    <div onClick={() => togglePillar(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '12px 15px', background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10 }}>
-                      <span style={{ color: MUTED, fontSize: 13, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
+                    <div onClick={view === 'list' ? () => togglePillar(p.id) : undefined} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: view === 'list' ? 'pointer' : 'default', padding: view === 'list' ? '12px 15px' : '0', background: view === 'list' ? '#fff' : 'transparent', border: view === 'list' ? '0.5px solid rgba(0,0,0,0.1)' : 'none', borderRadius: 10, marginBottom: view === 'grid' ? 12 : 0 }}>
+                      {view === 'list' && <span style={{ color: MUTED, fontSize: 13, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>}
                       <span style={{ width: 11, height: 11, borderRadius: 4, background: p.color, flexShrink: 0 }} />
                       <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>{p.name}</span>
                       <span style={{ fontSize: 12, color: MUTED }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
                     </div>
-                    {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10, paddingLeft: 12 }}>{list.map(renderItem)}</div>}
+                    {open && (view === 'grid' ? gridWrap(list) : <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10, paddingLeft: 12 }}>{list.map(renderItem)}</div>)}
                   </div>
                 ) })}
               </div>
             ) : shown.length === 0 ? <div style={{ ...CARD, textAlign: 'center', padding: 40, color: MUTED }}>Nothing here yet.</div>
-              : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{shown.map(renderItem)}</div>}
+              : view === 'grid' ? gridWrap(shown) : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{shown.map(renderItem)}</div>}
       </div>
 
       {editing && <ItemModal item={editing} cats={cats} onClose={() => setEditing(null)} onSave={upsertItem} />}
