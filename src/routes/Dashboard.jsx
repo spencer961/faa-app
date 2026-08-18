@@ -109,6 +109,7 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState([])
   const [cardPractice, setCardPractice] = useState({}) // {clientId: activePracticeName}
   const [reviewModal, setReviewModal] = useState(null) // clientId — quick-review popup
+  const [reviewAllModal, setReviewAllModal] = useState(false) // account-wide review popup
   const [accModal, setAccModal] = useState(null) // {type:'record'|'history'|'billing', clientId}
   const [undo, setUndo] = useState(null) // { clientId, restore }
   const [submissions, setSubmissions] = useState([])
@@ -348,7 +349,7 @@ export default function Dashboard() {
               {submissions.filter((s) => !s.reviewed).length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, background: '#d42020', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '1.5px solid #fff' }}>{submissions.filter((s) => !s.reviewed).length}</span>}
             </button>
             {(() => { const n = clients.reduce((a, c) => a + (c.info?.reviewItems || []).filter((i) => !i.done).length, 0); return (
-              <button onClick={() => navigate('/pulse?mode=consultant')} title="Your review desk" style={{ ...HBTN, position: 'relative' }}>To review{n > 0 && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: GOLD, color: NAVY, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{n}</span>}</button>
+              <button onClick={() => setReviewAllModal(true)} title="Your review desk" style={{ ...HBTN, position: 'relative' }}>To review{n > 0 && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: GOLD, color: NAVY, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{n}</span>}</button>
             ) })()}
             <button onClick={() => setAddClientModal(true)} style={{ ...HBTN, background: GOLD, color: NAVY, border: 'none', fontWeight: 600 }}>+ Client</button>
             <button onClick={() => setSelectModal(true)} style={HBTN}>Client Mode</button>
@@ -514,6 +515,7 @@ export default function Dashboard() {
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
       {reviewModal != null && (() => { const c = clients.find((x) => x.id === reviewModal); return c ? <ReviewModal c={c} onClose={() => setReviewModal(null)} onToggle={toggleReviewItem} onOpenFull={() => { setReviewModal(null); navigate('/pulse?mode=consultant&client=' + c.id) }} /> : null })()}
+      {reviewAllModal && <ReviewAllModal clients={clients} onClose={() => setReviewAllModal(false)} onToggle={toggleReviewItem} onOpenClient={(c) => { setReviewAllModal(false); navigate('/pulse?mode=consultant&client=' + c.id) }} onOpenDesk={() => { setReviewAllModal(false); navigate('/pulse?mode=consultant') }} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
       {addClientModal && <AddClientModal onClose={() => setAddClientModal(false)} onSave={addClient} />}
       {archiveOpen && (
@@ -987,6 +989,31 @@ function InfoCard({ label, value, href }) {
   )
 }
 
+// Shared bits for the review popups.
+const sectionLbl = (color) => ({ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color, marginBottom: 2 })
+// Soft navy-tinted "open Client Pulse" button used in the review popups.
+const cpBtn = ({ height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 })
+const ArrowR = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+// One review / heads-up item row with a check-off box; used by both popups.
+function RvRow({ c, it, k, doneKey, onToggle }) {
+  const done = it[doneKey]
+  return (
+    <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start', padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
+      <button onClick={() => onToggle(c, k, it, doneKey)} aria-label="Mark done" style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: '1.5px solid ' + (done ? '#18a866' : 'rgba(0,0,0,0.25)'), background: done ? '#18a866' : '#fff', color: '#fff', cursor: 'pointer', marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1, padding: 0 }}>{done ? '✓' : ''}</button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', opacity: done ? 0.55 : 1 }}>
+          {it.url
+            ? <a href={it.url} target="_blank" rel="noopener" style={{ fontSize: 13.5, color: NAVY, fontWeight: 500, textDecoration: done ? 'line-through' : 'none' }}>{it.title} ↗</a>
+            : <span style={{ fontSize: 13.5, color: TEXT, textDecoration: done ? 'line-through' : 'none' }}>{it.title}</span>}
+          {it.kind && <span style={{ fontSize: 10, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 4, padding: '0 6px' }}>{it.kind}</span>}
+        </div>
+        {it.note && <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginTop: 3 }}><span style={{ color: '#a0a09e' }}>note:</span> {it.note}</div>}
+        {it.reply && <div style={{ fontSize: 12, color: NAVY, marginTop: 4, background: 'rgba(11,29,94,0.05)', borderRadius: 8, padding: '6px 9px', whiteSpace: 'pre-wrap' }}>↳ {it.reply}</div>}
+      </div>
+    </div>
+  )
+}
+
 // Quick-review popup opened from a card's "N to review" pill. Shows the client's
 // open heads-up + review items with checkboxes (saves like Client Pulse), plus a
 // button to open the full Client Pulse desk when a glance isn't enough.
@@ -1001,25 +1028,6 @@ function ReviewModal({ c, onClose, onToggle, onOpenFull }) {
   const heads = (info.headsUp || []).filter((i) => ids.heads.includes(i.id))
   const review = (info.reviewItems || []).filter((i) => ids.review.includes(i.id))
   const openLeft = review.filter((i) => !i.done).length + heads.filter((i) => !i.seen).length
-  const sectionLbl = (color) => ({ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color, marginBottom: 2 })
-  const row = (it, key, doneKey) => {
-    const done = it[doneKey]
-    return (
-      <div key={it.id} style={{ display: 'flex', gap: 11, alignItems: 'flex-start', padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
-        <button onClick={() => onToggle(c, key, it, doneKey)} aria-label="Mark done" style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: '1.5px solid ' + (done ? '#18a866' : 'rgba(0,0,0,0.25)'), background: done ? '#18a866' : '#fff', color: '#fff', cursor: 'pointer', marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1, padding: 0 }}>{done ? '✓' : ''}</button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', opacity: done ? 0.55 : 1 }}>
-            {it.url
-              ? <a href={it.url} target="_blank" rel="noopener" style={{ fontSize: 13.5, color: NAVY, fontWeight: 500, textDecoration: done ? 'line-through' : 'none' }}>{it.title} ↗</a>
-              : <span style={{ fontSize: 13.5, color: TEXT, textDecoration: done ? 'line-through' : 'none' }}>{it.title}</span>}
-            {it.kind && <span style={{ fontSize: 10, color: MUTED, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 4, padding: '0 6px' }}>{it.kind}</span>}
-          </div>
-          {it.note && <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginTop: 3 }}><span style={{ color: '#a0a09e' }}>note:</span> {it.note}</div>}
-          {it.reply && <div style={{ fontSize: 12, color: NAVY, marginTop: 4, background: 'rgba(11,29,94,0.05)', borderRadius: 8, padding: '6px 9px', whiteSpace: 'pre-wrap' }}>↳ {it.reply}</div>}
-        </div>
-      </div>
-    )
-  }
   return (
     <div onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 470, maxWidth: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
@@ -1029,15 +1037,63 @@ function ReviewModal({ c, onClose, onToggle, onOpenFull }) {
             <div style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{c.name}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>{openLeft > 0 ? openLeft + ' still to review' : 'All caught up'}</div>
           </div>
-          <button onClick={onOpenFull} title="Open the full Client Pulse desk" style={{ height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>Client Pulse
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-          </button>
+          <button onClick={onOpenFull} title="Open the full Client Pulse desk" style={cpBtn}>Client Pulse <ArrowR /></button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 21, lineHeight: 1, padding: '0 2px' }}>×</button>
         </div>
         <div style={{ padding: '12px 18px', overflowY: 'auto', flex: 1 }}>
           {heads.length === 0 && review.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic', textAlign: 'center', padding: '24px 0' }}>All caught up 🎉</div>}
-          {heads.length > 0 && <div style={{ marginBottom: review.length ? 16 : 0 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.map((it) => row(it, 'headsUp', 'seen'))}</div>}
-          {review.length > 0 && <div><div style={sectionLbl('#185fa5')}>To review</div>{review.map((it) => row(it, 'reviewItems', 'done'))}</div>}
+          {heads.length > 0 && <div style={{ marginBottom: review.length ? 16 : 0 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}</div>}
+          {review.length > 0 && <div><div style={sectionLbl('#185fa5')}>To review</div>{review.map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}</div>}
+        </div>
+        <div style={{ padding: '13px 18px', borderTop: '0.5px solid rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ height: 34, padding: '0 15px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.2)', background: '#fff', color: TEXT, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Account-wide review popup opened from the header "To review" button. Lists
+// every client with open heads-up / review items, grouped, with a check-off box
+// on each and a per-client "Client Pulse →" jump.
+function ReviewAllModal({ clients, onClose, onToggle, onOpenClient, onOpenDesk }) {
+  // Snapshot the open items per client at open time (same reason as ReviewModal).
+  const [snap] = useState(() => clients.map((c) => ({
+    id: c.id,
+    heads: (c.info?.headsUp || []).filter((i) => !i.seen).map((i) => i.id),
+    review: (c.info?.reviewItems || []).filter((i) => !i.done).map((i) => i.id),
+  })).filter((s) => s.heads.length || s.review.length))
+  const groups = snap.map((s) => {
+    const c = clients.find((x) => x.id === s.id)
+    if (!c) return null
+    const info = c.info || {}
+    return { c, heads: (info.headsUp || []).filter((i) => s.heads.includes(i.id)), review: (info.reviewItems || []).filter((i) => s.review.includes(i.id)) }
+  }).filter(Boolean)
+  const openLeft = groups.reduce((a, g) => a + g.heads.filter((i) => !i.seen).length + g.review.filter((i) => !i.done).length, 0)
+  return (
+    <div onClick={onClose} style={overlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 520, maxWidth: '100%', maxHeight: '86vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '15px 18px', borderBottom: '0.5px solid rgba(0,0,0,0.08)' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>To review</div>
+            <div style={{ fontSize: 11.5, color: MUTED }}>{openLeft > 0 ? openLeft + ' item' + (openLeft !== 1 ? 's' : '') + ' across ' + groups.length + ' client' + (groups.length !== 1 ? 's' : '') : 'All caught up'}</div>
+          </div>
+          <button onClick={onOpenDesk} title="Open the full review desk in Client Pulse" style={cpBtn}>Full desk <ArrowR /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 21, lineHeight: 1, padding: '0 2px' }}>×</button>
+        </div>
+        <div style={{ padding: '4px 18px 12px', overflowY: 'auto', flex: 1 }}>
+          {groups.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic', textAlign: 'center', padding: '28px 0' }}>All caught up 🎉</div>}
+          {groups.map(({ c, heads, review }) => (
+            <div key={c.id} style={{ padding: '13px 0', borderBottom: '0.5px solid rgba(0,0,0,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 2 }}>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 10.5, flexShrink: 0 }}>{ini(c.name)}</div>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: TEXT, flex: 1, minWidth: 0 }}>{c.name}</span>
+                <button onClick={() => onOpenClient(c)} title={'Open ' + c.name + ' in Client Pulse'} style={{ ...cpBtn, height: 26, padding: '0 10px', fontSize: 11.5 }}>Client Pulse <ArrowR /></button>
+              </div>
+              {heads.length > 0 && <div style={{ marginTop: 6 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}</div>}
+              {review.length > 0 && <div style={{ marginTop: heads.length ? 8 : 6 }}><div style={sectionLbl('#185fa5')}>To review</div>{review.map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}</div>}
+            </div>
+          ))}
         </div>
         <div style={{ padding: '13px 18px', borderTop: '0.5px solid rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ height: 34, padding: '0 15px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.2)', background: '#fff', color: TEXT, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Close</button>
