@@ -29,8 +29,6 @@ const CAT_PALETTE = [
 ]
 const catColor = (cat) => { let h = 0; for (const ch of String(cat || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return CAT_PALETTE[h % CAT_PALETTE.length] }
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
-// Open a client's Client Pulse review desk in a new tab (consultant view).
-const openPulseTab = (clientId) => window.open(window.location.origin + window.location.pathname + '#/pulse?mode=consultant&client=' + clientId, '_blank', 'noopener')
 // Short name for the compact filter: a custom info.abbr if set, else the
 // acronym of the client's name.
 const abbrOf = (c) => {
@@ -515,7 +513,7 @@ export default function Dashboard() {
         )}
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
-      {reviewModal != null && (() => { const c = clients.find((x) => x.id === reviewModal); return c ? <ReviewModal c={c} onClose={() => setReviewModal(null)} onToggle={toggleReviewItem} onOpenTab={() => openPulseTab(c.id)} onOpenFull={() => { setReviewModal(null); navigate('/pulse?mode=consultant&client=' + c.id) }} /> : null })()}
+      {reviewModal != null && (() => { const c = clients.find((x) => x.id === reviewModal); return c ? <ReviewModal c={c} onClose={() => setReviewModal(null)} onToggle={toggleReviewItem} onOpenFull={() => { setReviewModal(null); navigate('/pulse?mode=consultant&client=' + c.id) }} /> : null })()}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
       {addClientModal && <AddClientModal onClose={() => setAddClientModal(false)} onSave={addClient} />}
       {archiveOpen && (
@@ -992,7 +990,7 @@ function InfoCard({ label, value, href }) {
 // Quick-review popup opened from a card's "N to review" pill. Shows the client's
 // open heads-up + review items with checkboxes (saves like Client Pulse), plus a
 // button to open the full Client Pulse desk when a glance isn't enough.
-function ReviewModal({ c, onClose, onToggle, onOpenTab, onOpenFull }) {
+function ReviewModal({ c, onClose, onToggle, onOpenFull }) {
   const info = c.info || {}
   // Snapshot which items were open when the modal opened, so checking one keeps
   // it visible (struck through) instead of vanishing — you can still undo it.
@@ -1031,8 +1029,8 @@ function ReviewModal({ c, onClose, onToggle, onOpenTab, onOpenFull }) {
             <div style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{c.name}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>{openLeft > 0 ? openLeft + ' still to review' : 'All caught up'}</div>
           </div>
-          <button onClick={onOpenTab} title="Open review desk in a new tab" style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+          <button onClick={onOpenFull} title="Open the full Client Pulse desk" style={{ height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>Client Pulse
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
           </button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 21, lineHeight: 1, padding: '0 2px' }}>×</button>
         </div>
@@ -1041,9 +1039,8 @@ function ReviewModal({ c, onClose, onToggle, onOpenTab, onOpenFull }) {
           {heads.length > 0 && <div style={{ marginBottom: review.length ? 16 : 0 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.map((it) => row(it, 'headsUp', 'seen'))}</div>}
           {review.length > 0 && <div><div style={sectionLbl('#185fa5')}>To review</div>{review.map((it) => row(it, 'reviewItems', 'done'))}</div>}
         </div>
-        <div style={{ padding: '13px 18px', borderTop: '0.5px solid rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ padding: '13px 18px', borderTop: '0.5px solid rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ height: 34, padding: '0 15px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.2)', background: '#fff', color: TEXT, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Close</button>
-          <button onClick={onOpenFull} style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none', background: NAVY, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Open full Client Pulse →</button>
         </div>
       </div>
     </div>
