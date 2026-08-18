@@ -29,6 +29,9 @@ const CAT_PALETTE = [
 ]
 const catColor = (cat) => { let h = 0; for (const ch of String(cat || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return CAT_PALETTE[h % CAT_PALETTE.length] }
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+// Open the Client Pulse desk in a new tab (consultant view). Pass a clientId to
+// land on that client, or omit it for the account-wide review desk.
+const openPulseTab = (clientId) => window.open(window.location.origin + window.location.pathname + '#/pulse?mode=consultant' + (clientId ? '&client=' + clientId : ''), '_blank', 'noopener')
 // Short name for the compact filter: a custom info.abbr if set, else the
 // acronym of the client's name.
 const abbrOf = (c) => {
@@ -514,8 +517,8 @@ export default function Dashboard() {
         )}
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
-      {reviewModal != null && (() => { const c = clients.find((x) => x.id === reviewModal); return c ? <ReviewModal c={c} onClose={() => setReviewModal(null)} onToggle={toggleReviewItem} onOpenFull={() => { setReviewModal(null); navigate('/pulse?mode=consultant&client=' + c.id) }} /> : null })()}
-      {reviewAllModal && <ReviewAllModal clients={clients} onClose={() => setReviewAllModal(false)} onToggle={toggleReviewItem} onOpenClient={(c) => { setReviewAllModal(false); navigate('/pulse?mode=consultant&client=' + c.id) }} onOpenDesk={() => { setReviewAllModal(false); navigate('/pulse?mode=consultant') }} />}
+      {reviewModal != null && (() => { const c = clients.find((x) => x.id === reviewModal); return c ? <ReviewModal c={c} onClose={() => setReviewModal(null)} onToggle={toggleReviewItem} onOpenFull={() => openPulseTab(c.id)} /> : null })()}
+      {reviewAllModal && <ReviewAllModal clients={clients} onClose={() => setReviewAllModal(false)} onToggle={toggleReviewItem} onOpenClient={(c) => openPulseTab(c.id)} onOpenDesk={() => openPulseTab()} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
       {addClientModal && <AddClientModal onClose={() => setAddClientModal(false)} onSave={addClient} />}
       {archiveOpen && (
@@ -993,7 +996,7 @@ function InfoCard({ label, value, href }) {
 const sectionLbl = (color) => ({ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color, marginBottom: 2 })
 // Soft navy-tinted "open Client Pulse" button used in the review popups.
 const cpBtn = ({ height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 })
-const ArrowR = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+const ArrowR = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
 // One review / heads-up item row with a check-off box; used by both popups.
 function RvRow({ c, it, k, doneKey, onToggle }) {
   const done = it[doneKey]
