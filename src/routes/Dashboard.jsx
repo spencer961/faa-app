@@ -517,8 +517,8 @@ export default function Dashboard() {
         )}
       </div>
       {linkModal && <LinkModal modal={linkModal} link={linkModal.id ? links.find((l) => l.id === linkModal.id) : null} clients={clients} onSave={saveLink} onDelete={deleteLink} onClose={() => setLinkModal(null)} />}
-      {reviewModal != null && (() => { const c = clients.find((x) => x.id === reviewModal); return c ? <ReviewModal c={c} onClose={() => setReviewModal(null)} onToggle={toggleReviewItem} onOpenFull={() => openPulseTab(c.id)} /> : null })()}
-      {reviewAllModal && <ReviewAllModal clients={clients} onClose={() => setReviewAllModal(false)} onToggle={toggleReviewItem} onOpenClient={(c) => openPulseTab(c.id)} onOpenDesk={() => openPulseTab()} />}
+      {reviewModal != null && (() => { const c = clients.find((x) => x.id === reviewModal); return c ? <ReviewModal c={c} onClose={() => setReviewModal(null)} onToggle={toggleReviewItem} onOpenFull={() => { openPulseTab(c.id); setReviewModal(null) }} /> : null })()}
+      {reviewAllModal && <ReviewAllModal clients={clients} onClose={() => setReviewAllModal(false)} onToggle={toggleReviewItem} onOpenClient={(c) => { openPulseTab(c.id); setReviewAllModal(false) }} onOpenDesk={() => { openPulseTab(); setReviewAllModal(false) }} />}
       {accModal && <AccountingModal modal={accModal} client={clients.find((c) => c.id === accModal.clientId)} onClose={() => setAccModal(null)} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} />}
       {addClientModal && <AddClientModal onClose={() => setAddClientModal(false)} onSave={addClient} />}
       {archiveOpen && (

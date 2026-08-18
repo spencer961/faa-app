@@ -71,7 +71,8 @@
       "Bash(git commit -q -m 'Content library: label manager \\(inline pillar/team/package pickers\\) + category color editing *)",
       "Bash(git commit -q -m 'Dashboard: '\\\\''to review'\\\\'' pill opens a quick-review modal \\(check off inline, or open full Client Pulse\\) *)",
       "Bash(git commit -q -m 'Dashboard header '\\\\''To review'\\\\'' opens a consolidated modal \\(all clients, check off inline, per-client Client Pulse + full desk\\) *)",
-      "Bash(git commit -q -m 'Review modals: Client Pulse / Full desk buttons always open in a new tab \\(keep modal open\\) *)"
+      "Bash(git commit -q -m 'Review modals: Client Pulse / Full desk buttons always open in a new tab \\(keep modal open\\) *)",
+      "Bash(git commit *)"
     ]
   }
 }
