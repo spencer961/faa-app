@@ -997,6 +997,14 @@ const sectionLbl = (color) => ({ fontSize: 11, fontWeight: 700, textTransform: '
 // Soft navy-tinted "open Client Pulse" button used in the review popups.
 const cpBtn = ({ height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 })
 const ArrowR = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
+// Icon-only "open in Client Pulse (new tab)" button used in the review popups.
+function OpenTabBtn({ onClick, title, size = 30 }) {
+  return (
+    <button onClick={onClick} title={title} style={{ width: size, height: size, padding: 0, borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
+    </button>
+  )
+}
 // One review / heads-up item row with a check-off box; used by both popups.
 function RvRow({ c, it, k, doneKey, onToggle }) {
   const done = it[doneKey]
@@ -1047,7 +1055,7 @@ function ReviewModal({ c, onClose, onToggle, onOpenFull }) {
             <div style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{c.name}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>{openLeft > 0 ? openLeft + ' still to review' : 'All caught up'}</div>
           </div>
-          <button onClick={onOpenFull} title="Open the full Client Pulse desk" style={cpBtn}>Client Pulse <ArrowR /></button>
+          <OpenTabBtn onClick={onOpenFull} title="Open in Client Pulse (new tab)" />
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 21, lineHeight: 1, padding: '0 2px' }}>×</button>
         </div>
         <div style={{ padding: '12px 18px', overflowY: 'auto', flex: 1 }}>
@@ -1098,7 +1106,7 @@ function ReviewAllModal({ clients, onClose, onToggle, onOpenClient, onOpenDesk }
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 2 }}>
                 <div style={{ width: 26, height: 26, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 10.5, flexShrink: 0 }}>{ini(c.name)}</div>
                 <span style={{ fontSize: 13.5, fontWeight: 600, color: TEXT, flex: 1, minWidth: 0 }}>{c.name}</span>
-                <button onClick={() => onOpenClient(c)} title={'Open ' + c.name + ' in Client Pulse'} style={{ ...cpBtn, height: 26, padding: '0 10px', fontSize: 11.5 }}>Client Pulse <ArrowR /></button>
+                <OpenTabBtn onClick={() => onOpenClient(c)} title={'Open ' + c.name + ' in Client Pulse (new tab)'} size={28} />
               </div>
               {heads.length > 0 && <div style={{ marginTop: 6 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}{heads.length > REVIEW_CAP && <MoreRow n={heads.length - REVIEW_CAP} onClick={() => onOpenClient(c)} />}</div>}
               {review.length > 0 && <div style={{ marginTop: heads.length ? 8 : 6 }}><div style={sectionLbl('#185fa5')}>To review</div>{review.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}{review.length > REVIEW_CAP && <MoreRow n={review.length - REVIEW_CAP} onClick={() => onOpenClient(c)} />}</div>}
