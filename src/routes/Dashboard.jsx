@@ -1017,6 +1017,13 @@ function RvRow({ c, it, k, doneKey, onToggle }) {
   )
 }
 
+// Max items shown per section in the review popups before it collapses to a
+// "+N more" link that opens the full list in Client Pulse.
+const REVIEW_CAP = 5
+function MoreRow({ n, onClick }) {
+  return <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '9px 0 2px' }}>+{n} more — open Client Pulse <ArrowR /></button>
+}
+
 // Quick-review popup opened from a card's "N to review" pill. Shows the client's
 // open heads-up + review items with checkboxes (saves like Client Pulse), plus a
 // button to open the full Client Pulse desk when a glance isn't enough.
@@ -1045,8 +1052,8 @@ function ReviewModal({ c, onClose, onToggle, onOpenFull }) {
         </div>
         <div style={{ padding: '12px 18px', overflowY: 'auto', flex: 1 }}>
           {heads.length === 0 && review.length === 0 && <div style={{ fontSize: 13, color: MUTED, fontStyle: 'italic', textAlign: 'center', padding: '24px 0' }}>All caught up 🎉</div>}
-          {heads.length > 0 && <div style={{ marginBottom: review.length ? 16 : 0 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}</div>}
-          {review.length > 0 && <div><div style={sectionLbl('#185fa5')}>To review</div>{review.map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}</div>}
+          {heads.length > 0 && <div style={{ marginBottom: review.length ? 16 : 0 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}{heads.length > REVIEW_CAP && <MoreRow n={heads.length - REVIEW_CAP} onClick={onOpenFull} />}</div>}
+          {review.length > 0 && <div><div style={sectionLbl('#185fa5')}>To review</div>{review.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}{review.length > REVIEW_CAP && <MoreRow n={review.length - REVIEW_CAP} onClick={onOpenFull} />}</div>}
         </div>
         <div style={{ padding: '13px 18px', borderTop: '0.5px solid rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ height: 34, padding: '0 15px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.2)', background: '#fff', color: TEXT, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Close</button>
@@ -1093,8 +1100,8 @@ function ReviewAllModal({ clients, onClose, onToggle, onOpenClient, onOpenDesk }
                 <span style={{ fontSize: 13.5, fontWeight: 600, color: TEXT, flex: 1, minWidth: 0 }}>{c.name}</span>
                 <button onClick={() => onOpenClient(c)} title={'Open ' + c.name + ' in Client Pulse'} style={{ ...cpBtn, height: 26, padding: '0 10px', fontSize: 11.5 }}>Client Pulse <ArrowR /></button>
               </div>
-              {heads.length > 0 && <div style={{ marginTop: 6 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}</div>}
-              {review.length > 0 && <div style={{ marginTop: heads.length ? 8 : 6 }}><div style={sectionLbl('#185fa5')}>To review</div>{review.map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}</div>}
+              {heads.length > 0 && <div style={{ marginTop: 6 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}{heads.length > REVIEW_CAP && <MoreRow n={heads.length - REVIEW_CAP} onClick={() => onOpenClient(c)} />}</div>}
+              {review.length > 0 && <div style={{ marginTop: heads.length ? 8 : 6 }}><div style={sectionLbl('#185fa5')}>To review</div>{review.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}{review.length > REVIEW_CAP && <MoreRow n={review.length - REVIEW_CAP} onClick={() => onOpenClient(c)} />}</div>}
             </div>
           ))}
         </div>
