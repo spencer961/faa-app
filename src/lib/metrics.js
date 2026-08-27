@@ -15,24 +15,29 @@ export function divide(a, b) { const av = parseFloat(a), bv = parseFloat(b); if 
 // Layer 2 (lead sources by channel: Google Ads, Google, Social, etc., grouped by
 // marketing company e.g. TIE/DDS) and Layer 3 (patient-level closed-case log:
 // names, surgery dates, financing) are separate builds — not here yet.
+// `scope` controls which entry screen a row appears on:
+//   'daily'  — internal daily activity log only (not part of the weekly review)
+//   'weekly' — only entered/shown at the weekly review (leads + the rates)
+//   (none)   — shared: entered daily, rolls up into the weekly review
 export const METRICS = [
   // Lead activity
-  { id: 'leads', label: 'Lead Contact Attempts', section: 'Lead Activity', hint: '“# of Leads Worked”' },
-  { id: 'lead_phone_convos', label: 'Lead Phone Conversations', section: 'Lead Activity' },
+  { id: 'contact_attempts', label: 'Lead Contact Attempts', section: 'Lead Activity', scope: 'daily', hint: '“# of Leads Worked” — internal: is staff working the leads?' },
+  { id: 'lead_phone_convos', label: 'Lead Phone Conversations', section: 'Lead Activity', scope: 'daily' },
+  { id: 'leads', label: 'Leads', section: 'Lead Activity', scope: 'weekly', hint: '(ad clicks that didn’t book — counted weekly)' },
   { id: 'consults_scheduled', label: 'Appointments Scheduled', section: 'Lead Activity', hint: '(regardless of date)' },
-  { id: 'booking_rate', label: 'Schedule Rate', section: 'Lead Activity', calc: (d) => pct(d.consults_scheduled, d.leads), bench: { low: 15, high: 30 }, benchLabel: 'Benchmark: 15–30%' },
+  { id: 'booking_rate', label: 'Booking Rate', section: 'Lead Activity', scope: 'weekly', calc: (d) => pct(d.consults_scheduled, d.leads), bench: { low: 15, high: 30 }, benchLabel: 'Benchmark: 15–30%' },
   { id: 'rescheduled', label: 'Rescheduled', section: 'Lead Activity', hint: '(regardless of when scheduled)' },
   { id: 'cancelled', label: 'Cancelled NC/NS', section: 'Lead Activity', hint: '(regardless of when scheduled)' },
   // Show rate
   { id: 'consults_on_schedule', label: 'Consults on the Schedule', section: 'Show Rate' },
   { id: 'presented_treatment', label: 'Presented Treatment (Held Consultations)', section: 'Show Rate' },
-  { id: 'show_rate', label: 'Consult Show Rate', section: 'Show Rate', calc: (d) => pct(d.presented_treatment, d.consults_on_schedule), bench: { low: 60 }, benchLabel: 'Benchmark: 60%+' },
+  { id: 'show_rate', label: 'Consult Show Rate', section: 'Show Rate', scope: 'weekly', calc: (d) => pct(d.presented_treatment, d.consults_on_schedule), bench: { low: 60 }, benchLabel: 'Benchmark: 60%+' },
   // Closing
   { id: 'patients_closed', label: '# of Patients Closed', section: 'Closing', hint: '(regardless of consult date)' },
   { id: 'fixed_arches', label: '# of Full-FIXED Arches Closed', section: 'Closing', hint: '(# of arches, not patients)' },
   { id: 'removable_arches', label: '# of Full-REMOVABLE Arches Closed', section: 'Closing', hint: '(# of arches, not patients)' },
   { id: 'total_arches', label: 'Total Arches Closed', section: 'Closing', calc: (d) => add(d.fixed_arches, d.removable_arches) },
-  { id: 'close_rate', label: 'Close Rate', section: 'Closing', calc: (d) => pct(d.patients_closed, d.presented_treatment), bench: { low: 25 }, benchLabel: 'Benchmark: 25%+' },
+  { id: 'close_rate', label: 'Close Rate', section: 'Closing', scope: 'weekly', calc: (d) => pct(d.patients_closed, d.presented_treatment), bench: { low: 25 }, benchLabel: 'Benchmark: 25%+' },
   // Revenue
   { id: 'closed_value', label: 'Total Closed $ Value', section: 'Revenue', dollar: true },
 ]

@@ -184,8 +184,10 @@ function ClientView({ clients, data, setData }) {
 
   const isToday = date === today()
   const isThisWeek = date === getWeekEnding(today())
-  const filled = INPUT_METRICS.filter((m) => form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null).length
-  const totalInputs = INPUT_METRICS.length
+  // Weekly clients enter Leads + shared metrics; daily clients enter the activity log.
+  const shownInputs = INPUT_METRICS.filter((m) => cadence === 'weekly' ? m.scope !== 'daily' : m.scope !== 'weekly')
+  const filled = shownInputs.filter((m) => form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null).length
+  const totalInputs = shownInputs.length
   // Enter or ↓ jumps to the next number field for fast keyboard entry.
   const onKey = (e) => {
     if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
@@ -196,9 +198,10 @@ function ClientView({ clients, data, setData }) {
   }
 
   // The clean single-column list — shared by the daily and weekly entry forms.
-  const entryListEl = (
+  // includeWeekly=true shows Leads + the rates (weekly review); false = daily log.
+  const entryList = (includeWeekly) => (
     <div className="sheet-list">
-      {METRICS.map((m) => m.calc ? (
+      {METRICS.filter((m) => includeWeekly ? m.scope !== 'daily' : m.scope !== 'weekly').map((m) => m.calc ? (
         <div className="sheet-row gold" key={m.id}>
           <span className="sheet-name">{m.label}</span>
           <span className="sheet-out">{fmtVal(m, calcVals[m.id])}</span>
@@ -247,7 +250,7 @@ function ClientView({ clients, data, setData }) {
             {progressEl}
           </div>
           <div className="sheet-tip">Tip: press <kbd>Tab</kbd> to jump to the next field.</div>
-          {entryListEl}
+          {entryList(false)}
         </div>
       ) : period === 'monthsheet' ? (
         <MonthGrid cid={cid} clients={clients} data={data} setData={setData} mode="daily" />
@@ -265,7 +268,7 @@ function ClientView({ clients, data, setData }) {
             {progressEl}
           </div>
           <div className="sheet-tip">Enter this client’s weekly totals. Press <kbd>Tab</kbd> to jump to the next field.</div>
-          {entryListEl}
+          {entryList(true)}
         </div>
       ) : (
         <AggView daily={data[cid]?.daily || {}} period={period} />
@@ -293,6 +296,8 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
   const [dirty, setDirty] = useState(false)
   const [toast, setToast] = useState('')
   const weekly = mode === 'weekly'
+  // Weeks sheet includes Leads + rates; the daily sheet is the activity log only.
+  const rowsMetrics = METRICS.filter((m) => weekly ? m.scope !== 'daily' : m.scope !== 'weekly')
   const cols = colsFor(mode, anchor)
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
 
@@ -314,7 +319,7 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
     setGrid((g) => {
       const ng = { ...g }
       matrix.forEach((rowVals, i) => {
-        const metric = METRICS[mIndex + i]
+        const metric = rowsMetrics[mIndex + i]
         if (!metric || metric.calc) return // never write into computed gold rows
         rowVals.forEach((raw, j) => {
           const dk = cols[dIndex + j]
@@ -344,7 +349,7 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
 
   const bodyRows = []
   let lastSec = null
-  METRICS.forEach((m, mi) => {
+  rowsMetrics.forEach((m, mi) => {
     if (m.section !== lastSec) { lastSec = m.section; bodyRows.push(<tr key={'sec_' + m.section} className="gt-sec"><td colSpan={cols.length + 1}>{SEC_LABEL[m.section] || m.section}</td></tr>) }
     bodyRows.push(
       <tr key={m.id} className={m.calc ? 'gt-gold' : ''}>
