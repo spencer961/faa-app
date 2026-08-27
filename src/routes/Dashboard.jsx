@@ -322,7 +322,7 @@ export default function Dashboard() {
   const M = (id) => METRICS.find((m) => m.id === id)
   const openTasks = (cid) => tasks.filter((t) => t.client_id === cid && t.status !== 'done').length
   const clientHealth = (cid) => { const s = snaps[cid] || []; if (!s.length) return null; const latest = [...s].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-1)[0]; return health(latest.scores) }
-  const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.total_closed_tx || 0, revenue: agg.total_revenue || 0 } }
+  const clientWeekly = (cid) => { const daily = metricsByClient[cid] || {}; const keys = Object.keys(daily).sort().slice(-7); if (!keys.length) return null; const agg = aggregate(keys.map((k) => daily[k])); return { leads: agg.leads || 0, closed: agg.patients_closed || 0, revenue: agg.closed_value || 0 } }
 
   const detail = detailId != null ? clients.find((c) => c.id === detailId) : null
   if (detail) return <Detail client={detail} links={links.filter((l) => l.clientId === detail.id)} onBack={() => setDetailId(null)} clients={clients} onSaveLink={saveLink} onDeleteLink={deleteLink} onSavePractices={savePractices} tiers={tiers} onToggleTier={toggleClientTier} onSetCadence={setClientCadence} onSaveAbbr={(id, v) => patchInfo(id, { abbr: v.trim() })} onSetColor={(id, v) => patchInfo(id, { color: v })} onSaveClient={saveClient} onDeleteClient={deleteClient} onArchive={setArchived} onSaveNotes={(id, log) => patchInfo(id, { notesLog: log })} onSavePayment={savePayment} onDeletePayment={deletePayment} onSaveBilling={saveBilling} onEditPayment={editPayment} canUndo={!!undo && undo.clientId === detail.id} onUndo={undoLast} toast={toast} clientMode={!!clientMode} clientModeName={clients.find((c) => c.id === clientMode)?.name || ''} onExitClientMode={() => { exitClientMode(); setDetailId(null) }} cmSince={cmSince} hiddenSections={cmHidden} />
@@ -461,7 +461,7 @@ export default function Dashboard() {
                 )}
                 {ct.metrics && (
                   <div onClick={(e) => go(e, '/metrics')} style={{ display: 'flex', gap: 6, marginBottom: 10, cursor: 'pointer' }}>
-                    {[['Leads', wk ? wk.leads : '—'], ['Closed', wk ? wk.closed : '—'], ['Revenue', wk ? fmtVal(M('total_revenue'), wk.revenue, true) : '—']].map(([l, v]) => (
+                    {[['Leads', wk ? wk.leads : '—'], ['Closed', wk ? wk.closed : '—'], ['Revenue', wk ? fmtVal(M('closed_value'), wk.revenue, true) : '—']].map(([l, v]) => (
                       <div key={l} style={{ flex: 1, background: BG, borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: TEXT, lineHeight: 1.1 }}>{v}</div>
                         <div style={{ fontSize: 9, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>{l}</div>

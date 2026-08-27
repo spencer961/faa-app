@@ -16,12 +16,6 @@ import {
 // Deferred from the original: Google-Sheet backup sync and auto-save
 // (replaced with an explicit Save button).
 
-const ENTRY_SECTIONS = [
-  { label: 'Lead Activity', desc: 'Leads and how many turned into booked consults', bg: '#E6F1FB', tc: '#0C447C', accent: '#0C447C', metrics: ['leads', 'lead_phone_convos', 'consults_scheduled', 'rescheduled', 'cancelled'], calcs: ['booking_rate'] },
-  { label: 'Show Rate', desc: 'Who actually showed up for their consult', bg: '#EEEDFE', tc: '#3C3489', accent: '#3C3489', metrics: ['consults_on_schedule', 'presented_treatment'], calcs: ['show_rate'] },
-  { label: 'Closing', desc: 'Treatment starts and arches closed', bg: '#E1F5EE', tc: '#085041', accent: '#085041', metrics: ['internal_closed_tx', 'internal_closed_arches', 'marketing_closed_tx', 'marketing_closed_arches'], calcs: ['total_closed_tx', 'total_closed_arches', 'close_rate'] },
-  { label: 'Revenue & Marketing', desc: 'Dollars in, dollars spent, and your return', bg: '#FAEEDA', tc: '#633806', accent: '#633806', metrics: ['internal_revenue', 'marketing_revenue', 'marketing_spend'], calcs: ['total_revenue', 'cpl', 'cost_per_consult', 'cost_per_tx', 'roas'] },
-]
 const M = (id) => METRICS.find((m) => m.id === id)
 const SEC_LABEL = { 'Lead Activity': 'Lead activity', 'Show Rate': 'Show rate', 'Closing': 'Closing', 'Revenue': 'Revenue', 'Marketing ROI': 'Marketing ROI' }
 const today = () => new Date().toISOString().split('T')[0]
@@ -122,7 +116,7 @@ function YoursView({ clients, data }) {
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="perf-table">
-            <thead><tr><th>Client</th><th>Booking rate</th><th>Show rate</th><th>Close rate</th><th>Total revenue</th><th>Last entry</th></tr></thead>
+            <thead><tr><th>Client</th><th>Schedule rate</th><th>Show rate</th><th>Close rate</th><th>Closed $ value</th><th>Last entry</th></tr></thead>
             <tbody>
               {shown.map((c) => {
                 const daily = data[c.id]?.daily || {}
@@ -137,7 +131,7 @@ function YoursView({ clients, data }) {
                     <td>{noData ? <span style={{ color: '#888786', fontStyle: 'italic' }}>No data</span> : badge('booking_rate', agg.booking_rate)}</td>
                     <td>{noData ? '' : badge('show_rate', agg.show_rate)}</td>
                     <td>{noData ? '' : badge('close_rate', agg.close_rate)}</td>
-                    <td style={{ fontWeight: 500 }}>{noData ? '—' : fmtVal(M('total_revenue'), agg.total_revenue)}</td>
+                    <td style={{ fontWeight: 500 }}>{noData ? '—' : fmtVal(M('closed_value'), agg.closed_value)}</td>
                     <td style={{ color: '#888786' }}>{last}</td>
                   </tr>
                 )
@@ -438,8 +432,8 @@ function TrendsView({ clients, data }) {
   if (range !== 0) { const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - range); const cut = cutoff.toISOString().split('T')[0].slice(0, 7); keys = keys.filter((k) => k >= cut) }
   const totals = aggregate(keys.map((k) => buckets[k]))
   const summary = [
-    ['leads', 'Total leads'], ['booking_rate', 'Avg booking rate'], ['show_rate', 'Avg show rate'], ['close_rate', 'Avg close rate'],
-    ['marketing_closed_tx', 'Total closed tx'], ['total_revenue', 'Total revenue'], ['total_closed_arches', 'Total arches'], ['roas', 'Avg ROAS'],
+    ['leads', 'Leads worked'], ['booking_rate', 'Avg schedule rate'], ['show_rate', 'Avg show rate'], ['close_rate', 'Avg close rate'],
+    ['patients_closed', 'Patients closed'], ['total_arches', 'Total arches'], ['closed_value', 'Closed $ value'], ['consults_scheduled', 'Consults booked'],
   ]
 
   useEffect(() => {
@@ -472,12 +466,11 @@ function TrendsView({ clients, data }) {
       { label: 'Close rate', data: get('close_rate'), borderColor: '#22c55e', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#22c55e', tension: 0.3 },
     ], { pct: true, yMax: 120 })
     build('revenue', 'bar', [
-      { label: 'Marketing revenue', data: get('marketing_revenue'), backgroundColor: 'rgba(11,29,94,0.75)', borderRadius: 3 },
-      { label: 'Internal revenue', data: get('internal_revenue'), backgroundColor: 'rgba(188,151,98,0.75)', borderRadius: 3 },
-    ], { dollar: true, stacked: true })
+      { label: 'Closed $ value', data: get('closed_value'), backgroundColor: 'rgba(11,29,94,0.75)', borderRadius: 3 },
+    ], { dollar: true })
     build('closing', 'bar', [
-      { label: 'Mktg closed tx', data: get('marketing_closed_tx'), backgroundColor: 'rgba(11,29,94,0.7)', borderRadius: 3, order: 2 },
-      { label: 'Total arches', data: get('total_closed_arches'), type: 'line', borderColor: '#5DCAA5', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#5DCAA5', tension: 0.3, order: 1 },
+      { label: 'Patients closed', data: get('patients_closed'), backgroundColor: 'rgba(11,29,94,0.7)', borderRadius: 3, order: 2 },
+      { label: 'Total arches', data: get('total_arches'), type: 'line', borderColor: '#5DCAA5', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#5DCAA5', tension: 0.3, order: 1 },
     ])
     return () => { Object.values(charts.current).forEach((c) => c.destroy()); charts.current = {} }
   }, [cid, period, range, data])

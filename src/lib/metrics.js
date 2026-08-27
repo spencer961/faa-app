@@ -9,37 +9,35 @@ export function pct(a, b) { const av = parseFloat(a), bv = parseFloat(b); if (!a
 export function add(a, b) { const av = parseFloat(a) || 0, bv = parseFloat(b) || 0; return av + bv || null }
 export function divide(a, b) { const av = parseFloat(a), bv = parseFloat(b); if (!av || !bv || bv === 0) return null; return Math.round(av / bv) }
 
-// The metric list — labels match the client's spreadsheet EXACTLY (column B).
-// `label` is the official row name; `hint` holds the clarifier note the sheet
-// shows beneath a name, displayed as a small helper line on the entry form.
+// The metric list — mirrors the client "Metrics Scorecard" Daily tab (Layer 1).
+// Entered daily; weekly/monthly roll up automatically. `label` is the row name;
+// `hint` is the small clarifier the sheet shows under a name.
+// Layer 2 (lead sources by channel: Google Ads, Google, Social, etc., grouped by
+// marketing company e.g. TIE/DDS) and Layer 3 (patient-level closed-case log:
+// names, surgery dates, financing) are separate builds — not here yet.
 export const METRICS = [
-  { id: 'leads', label: 'Lead Contact Attempts', section: 'Lead Activity', resp: '', hint: '"# of Leads Worked"' },
-  { id: 'lead_phone_convos', label: 'Lead Phone Conversations', section: 'Lead Activity', resp: '' },
-  { id: 'consults_scheduled', label: 'Consults Scheduled (Regardless of when)', section: 'Lead Activity', resp: '' },
-  { id: 'booking_rate', label: 'Lead Schedule Rate', section: 'Lead Activity', calc: (d) => pct(d.consults_scheduled, d.leads), bench: { low: 15, high: 30 }, benchLabel: 'Benchmark: 15–30%' },
-  { id: 'rescheduled', label: 'Rescheduled to a different day', section: 'Lead Activity', resp: '' },
-  { id: 'cancelled', label: 'Cancellations', section: 'Lead Activity', resp: '' },
-  { id: 'consults_on_schedule', label: 'Consults on the Schedule (from marketing)', section: 'Show Rate', resp: '' },
-  { id: 'presented_treatment', label: 'Presented Treatment (Held Consultations from marketing)', section: 'Show Rate', resp: '' },
+  // Lead activity
+  { id: 'leads', label: 'Lead Contact Attempts', section: 'Lead Activity', hint: '“# of Leads Worked”' },
+  { id: 'lead_phone_convos', label: 'Lead Phone Conversations', section: 'Lead Activity' },
+  { id: 'consults_scheduled', label: 'Appointments Scheduled', section: 'Lead Activity', hint: '(regardless of date)' },
+  { id: 'booking_rate', label: 'Schedule Rate', section: 'Lead Activity', calc: (d) => pct(d.consults_scheduled, d.leads), bench: { low: 15, high: 30 }, benchLabel: 'Benchmark: 15–30%' },
+  { id: 'rescheduled', label: 'Rescheduled', section: 'Lead Activity', hint: '(regardless of when scheduled)' },
+  { id: 'cancelled', label: 'Cancelled NC/NS', section: 'Lead Activity', hint: '(regardless of when scheduled)' },
+  // Show rate
+  { id: 'consults_on_schedule', label: 'Consults on the Schedule', section: 'Show Rate' },
+  { id: 'presented_treatment', label: 'Presented Treatment (Held Consultations)', section: 'Show Rate' },
   { id: 'show_rate', label: 'Consult Show Rate', section: 'Show Rate', calc: (d) => pct(d.presented_treatment, d.consults_on_schedule), bench: { low: 60 }, benchLabel: 'Benchmark: 60%+' },
-  { id: 'internal_closed_tx', label: 'INTERNAL Closed Treatment', section: 'Closing', resp: '', hint: '(# of pre-existing patients starting some form of implant treatment)' },
-  { id: 'internal_closed_arches', label: 'Internal Closed Arches', section: 'Closing', resp: '', hint: '(Not the # of patients)' },
-  { id: 'marketing_closed_tx', label: 'MARKETING Closed Treatment', section: 'Closing', resp: '', hint: '(# of 1st time patients closed from marketing regardless of consult date)' },
-  { id: 'marketing_closed_arches', label: 'Marketing Closed Arches', section: 'Closing', resp: '', hint: '(Not the # of patients)' },
-  { id: 'total_closed_tx', label: 'Total Closed Treatment', section: 'Closing', calc: (d) => add(d.internal_closed_tx, d.marketing_closed_tx) },
-  { id: 'total_closed_arches', label: 'Total Closed Arches', section: 'Closing', calc: (d) => add(d.internal_closed_arches, d.marketing_closed_arches) },
-  { id: 'close_rate', label: 'Close Rate', section: 'Closing', calc: (d) => pct(d.marketing_closed_tx, d.presented_treatment), bench: { low: 25 }, benchLabel: 'Benchmark: 25%+' },
-  { id: 'internal_revenue', label: 'Internal Closed Revenue', section: 'Revenue', resp: '', dollar: true },
-  { id: 'marketing_revenue', label: 'Marketing Closed Revenue', section: 'Revenue', resp: '', dollar: true },
-  { id: 'total_revenue', label: 'Total Closed Revenue', section: 'Revenue', calc: (d) => add(d.internal_revenue, d.marketing_revenue), dollar: true },
-  { id: 'marketing_spend', label: 'Total Marketing Budget/Spend', section: 'Marketing ROI', resp: '', dollar: true },
-  { id: 'cpl', label: 'Cost Per Lead (CPL)', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.leads), dollar: true },
-  { id: 'cost_per_consult', label: 'Cost Per Consult', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.consults_on_schedule), dollar: true },
-  { id: 'cost_per_tx', label: 'Cost Per Treatment Start', section: 'Marketing ROI', calc: (d) => divide(d.marketing_spend, d.marketing_closed_tx), dollar: true },
-  { id: 'roas', label: 'Return on Ad Spend (ROAS)', section: 'Marketing ROI', calc: (d) => divide(d.marketing_revenue, d.marketing_spend), roas: true },
+  // Closing
+  { id: 'patients_closed', label: '# of Patients Closed', section: 'Closing', hint: '(regardless of consult date)' },
+  { id: 'fixed_arches', label: '# of Full-FIXED Arches Closed', section: 'Closing', hint: '(# of arches, not patients)' },
+  { id: 'removable_arches', label: '# of Full-REMOVABLE Arches Closed', section: 'Closing', hint: '(# of arches, not patients)' },
+  { id: 'total_arches', label: 'Total Arches Closed', section: 'Closing', calc: (d) => add(d.fixed_arches, d.removable_arches) },
+  { id: 'close_rate', label: 'Close Rate', section: 'Closing', calc: (d) => pct(d.patients_closed, d.presented_treatment), bench: { low: 25 }, benchLabel: 'Benchmark: 25%+' },
+  // Revenue
+  { id: 'closed_value', label: 'Total Closed $ Value', section: 'Revenue', dollar: true },
 ]
 
-export const KEY_METRICS = ['booking_rate', 'show_rate', 'close_rate', 'total_revenue']
+export const KEY_METRICS = ['booking_rate', 'show_rate', 'close_rate', 'closed_value']
 export const INPUT_METRICS = METRICS.filter((m) => !m.calc)
 
 export function fmtVal(m, v, short = false) {

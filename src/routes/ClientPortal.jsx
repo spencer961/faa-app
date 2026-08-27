@@ -170,7 +170,7 @@ function PortalView({ client, tasks, snaps, metricsByClient, tierAccess, adminBa
                 <div style={{ fontSize: 13, fontWeight: 600, color: TEXT, marginBottom: 2 }}>This week</div>
                 <div style={{ fontSize: 12, color: MUTED, marginBottom: 14 }}>Last 7 days of activity</div>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  {[['Leads', wk ? wk.leads : '—'], ['Closed', wk ? wk.total_closed_tx || 0 : '—'], ['Revenue', wk ? fmtVal(M('total_revenue'), wk.total_revenue, true) : '—']].map(([l, v]) => (
+                  {[['Leads', wk ? wk.leads : '—'], ['Closed', wk ? wk.patients_closed || 0 : '—'], ['Revenue', wk ? fmtVal(M('closed_value'), wk.closed_value, true) : '—']].map(([l, v]) => (
                     <div key={l} style={{ flex: 1, background: BG, borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
                       <div style={{ fontSize: 22, fontWeight: 700, color: NAVY, lineHeight: 1 }}>{v}</div>
                       <div style={{ fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 5 }}>{l}</div>

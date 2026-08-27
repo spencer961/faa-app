@@ -72,7 +72,12 @@
       "Bash(git commit -q -m 'Dashboard: '\\\\''to review'\\\\'' pill opens a quick-review modal \\(check off inline, or open full Client Pulse\\) *)",
       "Bash(git commit -q -m 'Dashboard header '\\\\''To review'\\\\'' opens a consolidated modal \\(all clients, check off inline, per-client Client Pulse + full desk\\) *)",
       "Bash(git commit -q -m 'Review modals: Client Pulse / Full desk buttons always open in a new tab \\(keep modal open\\) *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Read(//Users/bobbiejohealey/Downloads/**)",
+      "Bash(python3 -c ' *)",
+      "Bash(pip3 install *)",
+      "Bash(python3 -c \"import openpyxl; print\\('ok'\\)\")",
+      "Bash(cp \"/Users/bobbiejohealey/Downloads/Copy of Metrics Scorecard -.xlsx\" \"/private/tmp/claude-501/-Users-bobbiejohealey-Documents-FAA-Full-Arch-App/c6e2960d-d400-4f7c-8509-7555c79fbf5c/scratchpad/metrics.xlsx\" && echo copied && ls -la \"/private/tmp/claude-501/-Users-bobbiejohealey-Documents-FAA-Full-Arch-App/c6e2960d-d400-4f7c-8509-7555c79fbf5c/scratchpad/metrics.xlsx\")"
     ]
   }
 }
