@@ -4,6 +4,7 @@ import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase, SUPABASE_URL, SB_HEADERS } from '../lib/supabase.js'
 import { isSuperAdmin } from '../lib/auth.js'
 import { DEFAULT_TIERS, TIER_PALETTE, MODULES, DEFAULT_TIER_ACCESS } from '../lib/tiers.js'
+import { uid as vuid, VENDOR_TYPES, VENDOR_PALETTE } from '../lib/vendors.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Super Admin — the owner's control panel for running and scaling the
@@ -21,6 +22,7 @@ export default function SuperAdmin() {
   const [clients, setClients] = useState([])
   const [toast, setToast] = useState('')
   const [newTier, setNewTier] = useState('')
+  const [newVendor, setNewVendor] = useState('')
 
   useEffect(() => {
     ;(async () => {
@@ -57,6 +59,15 @@ export default function SuperAdmin() {
   const editTier = (id, fields) => patch({ tiers: tiers.map((t) => (t.id === id ? { ...t, ...fields } : t)) })
   const deleteTier = (id) => patch({ tiers: tiers.filter((t) => t.id !== id) })
   const toggleAccess = (tid, mid) => patch({ tierAccess: { ...tierAccess, [tid]: { ...(tierAccess[tid] || {}), [mid]: !(tierAccess[tid] || {})[mid] } } })
+
+  // Vendors — shared directory (marketing / SEO / etc.), archived not deleted.
+  const vendors = data?.vendors || []
+  const addVendor = () => {
+    const name = newVendor.trim(); if (!name) return
+    patch({ vendors: [...vendors, { id: vuid(), name, type: 'marketing', color: VENDOR_PALETTE[vendors.length % VENDOR_PALETTE.length], archived: false }] }); setNewVendor('')
+  }
+  const editVendor = (id, fields) => patch({ vendors: vendors.map((v) => (v.id === id ? { ...v, ...fields } : v)) })
+  const archiveVendor = (id) => patch({ vendors: vendors.map((v) => (v.id === id ? { ...v, archived: !v.archived } : v)) })
 
   async function exportBackup() {
     const { data: cs } = await supabase.from('clients').select('*')
@@ -136,6 +147,28 @@ export default function SuperAdmin() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </Section>
+
+        {/* Vendors — LIVE (shared directory) */}
+        <Section title="Vendors" tone="live" desc="Your shared list of marketing companies, SEO companies and other vendors. Many clients can use the same vendor — each client links to the ones they use (on their Metrics). Archive a vendor when it's no longer used; its past numbers keep their label.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {vendors.length === 0 && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic' }}>No vendors yet — add your first marketing or SEO company below.</div>}
+            {vendors.map((v) => (
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 8, background: '#fff', opacity: v.archived ? 0.55 : 1 }}>
+                <input type="color" value={v.color} onChange={(e) => editVendor(v.id, { color: e.target.value })} style={{ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }} />
+                <input defaultValue={v.name} onBlur={(e) => e.target.value.trim() && editVendor(v.id, { name: e.target.value.trim() })} style={{ flex: 1, height: 32, border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 6, padding: '0 10px', fontSize: 13, background: '#fff', fontFamily: 'inherit' }} />
+                <select value={v.type} onChange={(e) => editVendor(v.id, { type: e.target.value })} style={{ height: 32, border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 6, padding: '0 8px', fontSize: 12.5, background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>
+                  {VENDOR_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                {v.archived && <span style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic' }}>archived</span>}
+                <button onClick={() => archiveVendor(v.id)} title={v.archived ? 'Unarchive' : 'Archive'} style={{ background: 'none', border: 'none', color: v.archived ? '#0f7a49' : MUTED, cursor: 'pointer', fontSize: 15, padding: '0 4px' }}>{v.archived ? '↩' : '⊘'}</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input value={newVendor} onChange={(e) => setNewVendor(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addVendor()} placeholder="Add a vendor (e.g. TIE, DDS Marketing, an SEO company)" style={{ flex: 1, height: 36, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 12px', fontSize: 13, background: '#fff', fontFamily: 'inherit' }} />
+            <button onClick={addVendor} style={btnP}>Add vendor</button>
           </div>
         </Section>
 
