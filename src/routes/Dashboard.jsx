@@ -349,7 +349,8 @@ export default function Dashboard() {
       } />
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px' }}>
         {!clientMode && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', position: 'sticky', top: 58, zIndex: 15, background: BG, padding: '12px 0', marginTop: -12, marginBottom: 6 }}>
+          <div style={{ position: 'sticky', top: 58, zIndex: 15, background: BG, marginTop: -12, paddingTop: 12, paddingBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', marginBottom: 10 }}>
             <button onClick={() => setInboxOpen(true)} title="Onboarding submissions" style={{ position: 'relative', width: 34, height: 32, borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: '#fff', color: NAVY, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>
               {submissions.filter((s) => !s.reviewed).length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, background: '#d42020', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '1.5px solid #fff' }}>{submissions.filter((s) => !s.reviewed).length}</span>}
@@ -361,9 +362,7 @@ export default function Dashboard() {
             <button onClick={() => setSelectModal(true)} style={HBTN}>Client Mode</button>
             <button onClick={() => setEditMode((e) => !e)} style={editMode ? { ...HBTN, background: GOLD, color: NAVY, border: 'none' } : HBTN}>{editMode ? 'Done editing' : 'Edit links'}</button>
           </div>
-        )}
-        {!clientMode && (
-          <div style={{ marginBottom: 18 }}>
+          <div>
             <div style={ctrlPanel('#f1eee9')}>
               <div style={{ display: 'flex', gap: 4, background: '#e3dfd8', borderRadius: 999, padding: 3, width: 'fit-content' }}>
                 {[['clients', 'By client'], ['category', 'By category']].map(([v, label]) => (
@@ -402,6 +401,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+          </div>
           </div>
         )}
         {!clients.length && <div style={{ textAlign: 'center', padding: 60, color: MUTED, fontStyle: 'italic' }}>Loading clients…</div>}
