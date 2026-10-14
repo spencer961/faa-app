@@ -9,6 +9,7 @@ import ClientPortal from './routes/ClientPortal.jsx'
 import SuperAdmin from './routes/SuperAdmin.jsx'
 import ClientPulse from './routes/ClientPulse.jsx'
 import ContentLibrary from './routes/ContentLibrary.jsx'
+import VendorHub from './routes/VendorHub.jsx'
 import Login, { Splash } from './routes/Login.jsx'
 import { useAuth } from './lib/AuthContext.jsx'
 import AppShell from './components/AppShell.jsx'
@@ -33,6 +34,7 @@ export default function App() {
       <Route path="/portal" element={<ClientPortal />} />
       <Route path="/pulse" element={<ClientPulse />} />
       <Route path="/content" element={<ContentLibrary />} />
+      <Route path="/vendor-hub" element={<VendorHub />} />
       <Route path="/admin" element={<SuperAdmin />} />
     </Routes>
   )

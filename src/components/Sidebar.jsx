@@ -24,6 +24,7 @@ const I = {
   file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h6M9 17h4" /></>,
   users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" /></>,
   shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+  vendor: <><rect x="2" y="7" width="20" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M2 12h20" /></>,
 }
 
 const NAV = [
@@ -34,6 +35,7 @@ const NAV = [
   { to: '/metrics', label: 'Metrics Tracker', icon: I.chart },
   { to: '/tasks', label: 'To-Do Lists', icon: I.check },
   { to: '/content', label: 'Content', icon: I.play },
+  { to: '/vendor-hub', label: 'Vendor Updates', icon: I.vendor },
   { group: 'Intake' },
   { to: '/onboarding', label: 'Onboarding Form', icon: I.file },
   { to: '/portal', label: 'Client Portal', icon: I.users },
