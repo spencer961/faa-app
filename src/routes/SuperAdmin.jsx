@@ -4,7 +4,7 @@ import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase, SUPABASE_URL, SB_HEADERS } from '../lib/supabase.js'
 import { isSuperAdmin } from '../lib/auth.js'
 import { DEFAULT_TIERS, TIER_PALETTE, MODULES, DEFAULT_TIER_ACCESS } from '../lib/tiers.js'
-import { uid as vuid, VENDOR_TYPES, VENDOR_PALETTE } from '../lib/vendors.js'
+import { uid as vuid, VENDOR_TYPES, VENDOR_PALETTE, abbrOf, vendorContacts } from '../lib/vendors.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Super Admin — the owner's control panel for running and scaling the
@@ -23,6 +23,7 @@ export default function SuperAdmin() {
   const [toast, setToast] = useState('')
   const [newTier, setNewTier] = useState('')
   const [newVendor, setNewVendor] = useState('')
+  const [openVendor, setOpenVendor] = useState(null)
 
   useEffect(() => {
     ;(async () => {
@@ -64,10 +65,15 @@ export default function SuperAdmin() {
   const vendors = data?.vendors || []
   const addVendor = () => {
     const name = newVendor.trim(); if (!name) return
-    patch({ vendors: [...vendors, { id: vuid(), name, type: 'marketing', color: VENDOR_PALETTE[vendors.length % VENDOR_PALETTE.length], archived: false }] }); setNewVendor('')
+    const id = vuid()
+    patch({ vendors: [...vendors, { id, name, abbr: '', type: 'marketing', color: VENDOR_PALETTE[vendors.length % VENDOR_PALETTE.length], archived: false, contacts: [] }] })
+    setNewVendor(''); setOpenVendor(id)
   }
   const editVendor = (id, fields) => patch({ vendors: vendors.map((v) => (v.id === id ? { ...v, ...fields } : v)) })
   const archiveVendor = (id) => patch({ vendors: vendors.map((v) => (v.id === id ? { ...v, archived: !v.archived } : v)) })
+  const addContact = (vid) => { const v = vendors.find((x) => x.id === vid); editVendor(vid, { contacts: [...vendorContacts(v), { id: vuid(), name: '', email: '', title: '' }] }) }
+  const editContact = (vid, cid, fields) => { const v = vendors.find((x) => x.id === vid); editVendor(vid, { contacts: vendorContacts(v).map((c) => (c.id === cid ? { ...c, ...fields } : c)) }) }
+  const removeContact = (vid, cid) => { if (!window.confirm('Remove this contact?')) return; const v = vendors.find((x) => x.id === vid); editVendor(vid, { contacts: vendorContacts(v).filter((c) => c.id !== cid) }) }
 
   async function exportBackup() {
     const { data: cs } = await supabase.from('clients').select('*')
@@ -152,22 +158,52 @@ export default function SuperAdmin() {
 
         {/* Vendors — LIVE (shared directory) */}
         <Section title="Vendors" tone="live" desc="Your shared list of marketing companies, SEO companies and other vendors. Many clients can use the same vendor — each client links to the ones they use (on their Metrics). Archive a vendor when it's no longer used; its past numbers keep their label.">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {vendors.length === 0 && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic' }}>No vendors yet — add your first marketing or SEO company below.</div>}
-            {vendors.map((v) => (
-              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 8, background: '#fff', opacity: v.archived ? 0.55 : 1 }}>
-                <input type="color" value={v.color} onChange={(e) => editVendor(v.id, { color: e.target.value })} style={{ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }} />
-                <input defaultValue={v.name} onBlur={(e) => e.target.value.trim() && editVendor(v.id, { name: e.target.value.trim() })} style={{ flex: 1, height: 32, border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 6, padding: '0 10px', fontSize: 13, background: '#fff', fontFamily: 'inherit' }} />
-                <select value={v.type} onChange={(e) => editVendor(v.id, { type: e.target.value })} style={{ height: 32, border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 6, padding: '0 8px', fontSize: 12.5, background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>
-                  {VENDOR_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-                {v.archived && <span style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic' }}>archived</span>}
-                <button onClick={() => archiveVendor(v.id)} title={v.archived ? 'Unarchive' : 'Archive'} style={{ background: 'none', border: 'none', color: v.archived ? '#0f7a49' : MUTED, cursor: 'pointer', fontSize: 15, padding: '0 4px' }}>{v.archived ? '↩' : '⊘'}</button>
-              </div>
-            ))}
+            {vendors.map((v) => {
+              const open = openVendor === v.id; const contacts = vendorContacts(v)
+              return (
+                <div key={v.id} style={{ border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10, background: '#fff', overflow: 'hidden', opacity: v.archived ? 0.6 : 1 }}>
+                  <div onClick={() => setOpenVendor(open ? null : v.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: v.color, borderRadius: 6, padding: '2px 8px', flexShrink: 0, minWidth: 34, textAlign: 'center' }}>{abbrOf(v)}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: TEXT }}>{v.name}</span>
+                    <span style={{ fontSize: 11, color: MUTED }}>· {VENDOR_TYPES.find((t) => t.id === v.type)?.name || 'Other'}</span>
+                    {contacts.length > 0 && <span style={{ fontSize: 11, color: MUTED }}>· {contacts.length} {contacts.length === 1 ? 'person' : 'people'}</span>}
+                    {v.archived && <span style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic' }}>archived</span>}
+                    <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => archiveVendor(v.id)} title={v.archived ? 'Unarchive' : 'Archive'} style={{ background: 'none', border: 'none', color: v.archived ? '#0f7a49' : MUTED, cursor: 'pointer', fontSize: 15, padding: '0 2px' }}>{v.archived ? '↩' : '⊘'}</button>
+                      <span style={{ color: MUTED, fontSize: 12, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>▸</span>
+                    </span>
+                  </div>
+                  {open && (
+                    <div style={{ padding: '12px 14px 14px', borderTop: '0.5px solid rgba(0,0,0,0.07)' }}>
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                        <label style={fLbl}>Full name<input defaultValue={v.name} onBlur={(e) => e.target.value.trim() && editVendor(v.id, { name: e.target.value.trim() })} style={{ ...fInp, width: 240 }} /></label>
+                        <label style={fLbl}>Abbreviation<input defaultValue={v.abbr} onBlur={(e) => editVendor(v.id, { abbr: e.target.value.trim() })} placeholder={abbrOf(v)} style={{ ...fInp, width: 100 }} /></label>
+                        <label style={fLbl}>Type<select value={v.type} onChange={(e) => editVendor(v.id, { type: e.target.value })} style={{ ...fInp, cursor: 'pointer' }}>{VENDOR_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+                        <label style={fLbl}>Color<input type="color" value={v.color} onChange={(e) => editVendor(v.id, { color: e.target.value })} style={{ width: 40, height: 34, border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 7, background: '#fff', padding: 2, cursor: 'pointer' }} /></label>
+                      </div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, marginBottom: 3 }}>People at this vendor</div>
+                      <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 9 }}>The contacts here are who you’ll assign as a client’s account manager.</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                        {contacts.map((c) => (
+                          <div key={c.id} style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input defaultValue={c.name} onBlur={(e) => editContact(v.id, c.id, { name: e.target.value.trim() })} placeholder="Name" style={{ ...fInp, flex: '1 1 130px' }} />
+                            <input defaultValue={c.email} onBlur={(e) => editContact(v.id, c.id, { email: e.target.value.trim() })} placeholder="Email" style={{ ...fInp, flex: '1 1 160px' }} />
+                            <input defaultValue={c.title} onBlur={(e) => editContact(v.id, c.id, { title: e.target.value.trim() })} placeholder="Title (optional)" style={{ ...fInp, flex: '1 1 130px' }} />
+                            <button onClick={() => removeContact(v.id, c.id)} title="Remove" style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>×</button>
+                          </div>
+                        ))}
+                        <button onClick={() => addContact(v.id)} style={{ alignSelf: 'flex-start', marginTop: 2, background: 'none', border: 'none', color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0' }}>+ Add person</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <input value={newVendor} onChange={(e) => setNewVendor(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addVendor()} placeholder="Add a vendor (e.g. TIE, DDS Marketing, an SEO company)" style={{ flex: 1, height: 36, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 12px', fontSize: 13, background: '#fff', fontFamily: 'inherit' }} />
+            <input value={newVendor} onChange={(e) => setNewVendor(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addVendor()} placeholder="Add a vendor (e.g. The Implant Engine, an SEO company)" style={{ flex: 1, height: 36, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 12px', fontSize: 13, background: '#fff', fontFamily: 'inherit' }} />
             <button onClick={addVendor} style={btnP}>Add vendor</button>
           </div>
         </Section>
@@ -246,6 +282,8 @@ export default function SuperAdmin() {
 }
 
 const btnP = { padding: '9px 18px', borderRadius: 8, border: 'none', background: NAVY, color: GOLD, cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: 'inherit' }
+const fLbl = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: MUTED }
+const fInp = { height: 34, border: '0.5px solid rgba(0,0,0,0.14)', borderRadius: 7, padding: '0 9px', fontSize: 13, background: '#fff', color: TEXT, fontFamily: 'inherit', fontWeight: 400, textTransform: 'none', letterSpacing: 'normal' }
 const btnS = { padding: '9px 16px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: 'transparent', color: TEXT, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }
 
 function Badge({ tone, children }) {
