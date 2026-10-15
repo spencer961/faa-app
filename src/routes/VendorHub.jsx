@@ -28,6 +28,7 @@ export default function VendorHub() {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ vendorId: '', date: today(), text: '' })
   const [editing, setEditing] = useState(null) // update being edited
+  const [updFilter, setUpdFilter] = useState('all') // vendorId or 'all' — filters the history
 
   useEffect(() => {
     ;(async () => {
@@ -45,6 +46,11 @@ export default function VendorHub() {
   const allUpdates = client?.info?.vendorUpdates || []
   const updates = [...allUpdates].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
   const lastFor = (vid) => allUpdates.filter((u) => u.vendorId === vid).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]
+  // History view — filter by vendor, grouped by month (updates already sorted newest-first).
+  const shownUpdates = updFilter === 'all' ? updates : updates.filter((u) => u.vendorId === updFilter)
+  const monthGroups = []
+  shownUpdates.forEach((u) => { const mk = (u.date || '').slice(0, 7) || '—'; let g = monthGroups.find((x) => x.mk === mk); if (!g) { g = { mk, items: [] }; monthGroups.push(g) } g.items.push(u) })
+  const monthLabel = (mk) => { try { return new Date(mk + '-01T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) } catch { return mk } }
 
   async function patchClient(patchObj) {
     if (!client) return
@@ -111,7 +117,7 @@ export default function VendorHub() {
             {/* Updates log */}
             <div style={card}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-                <span style={secTitle}>Latest updates</span>
+                <span style={secTitle}>Updates history{updates.length > 0 ? ' · ' + updates.length : ''}</span>
                 <button onClick={() => { setAdding((o) => !o); setForm({ vendorId: activeVendors(vendors)[0]?.id || '', date: today(), text: '' }) }} style={{ ...btnPrimary, marginLeft: 'auto' }}>+ Add update</button>
               </div>
 
@@ -134,32 +140,48 @@ export default function VendorHub() {
 
               {updates.length === 0 && !adding && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic' }}>No updates logged yet. Click “+ Add update” to log what a vendor has reported.</div>}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {updates.map((u) => { const v = vendorById(vendors, u.vendorId) || { name: 'Unknown vendor', color: '#9a9a96' }
-                  if (editing && editing.id === u.id) return (
-                    <div key={u.id} style={{ border: '0.5px solid ' + NAVY, borderRadius: 11, padding: 13, background: '#fbfcff' }}>
-                      <div style={{ display: 'flex', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
-                        <select value={editing.vendorId} onChange={(e) => setEditing({ ...editing, vendorId: e.target.value })} style={inp}>{activeVendors(vendors).map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}</select>
-                        <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} style={{ ...inp, maxWidth: 160 }} />
-                      </div>
-                      <textarea value={editing.text} onChange={(e) => setEditing({ ...editing, text: e.target.value })} style={{ ...inp, width: '100%', minHeight: 60, resize: 'vertical' }} />
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 9 }}><button onClick={() => setEditing(null)} style={btnGhost}>Cancel</button><button onClick={saveEdit} style={btnPrimary}>Save</button></div>
+              {updates.length > 0 && linked.length > 1 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                  <button onClick={() => setUpdFilter('all')} style={fpill(updFilter === 'all')}>All vendors</button>
+                  {linked.map((v) => <button key={v.id} onClick={() => setUpdFilter(v.id)} title={v.name} style={fpill(updFilter === v.id)}>{abbrOf(v)}</button>)}
+                </div>
+              )}
+
+              {updates.length > 0 && shownUpdates.length === 0 && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic' }}>No updates from this vendor yet.</div>}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {monthGroups.map((g) => (
+                  <div key={g.mk}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 9, paddingBottom: 6, borderBottom: '0.5px solid rgba(0,0,0,0.08)' }}>{monthLabel(g.mk)}<span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}> · {g.items.length}</span></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {g.items.map((u) => { const v = vendorById(vendors, u.vendorId) || { name: 'Unknown vendor', color: '#9a9a96' }
+                        if (editing && editing.id === u.id) return (
+                          <div key={u.id} style={{ border: '0.5px solid ' + NAVY, borderRadius: 11, padding: 13, background: '#fbfcff' }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
+                              <select value={editing.vendorId} onChange={(e) => setEditing({ ...editing, vendorId: e.target.value })} style={inp}>{activeVendors(vendors).map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}</select>
+                              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} style={{ ...inp, maxWidth: 160 }} />
+                            </div>
+                            <textarea value={editing.text} onChange={(e) => setEditing({ ...editing, text: e.target.value })} style={{ ...inp, width: '100%', minHeight: 60, resize: 'vertical' }} />
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 9 }}><button onClick={() => setEditing(null)} style={btnGhost}>Cancel</button><button onClick={saveEdit} style={btnPrimary}>Save</button></div>
+                          </div>
+                        )
+                        return (
+                          <div key={u.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 11, padding: '12px 14px', background: '#fff' }}>
+                            <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, background: v.color, flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 5 }}>{vChip(v)}<span style={{ fontSize: 11.5, color: MUTED }}>{fmtDate(u.date)}</span></div>
+                              <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{u.text}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <button onClick={() => setEditing({ id: u.id, vendorId: u.vendorId, date: u.date, text: u.text })} title="Edit" style={iconBtn}>✎</button>
+                              <button onClick={() => deleteUpdate(u)} title="Delete" style={{ ...iconBtn, color: '#A32D2D' }}>×</button>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                  return (
-                    <div key={u.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 11, padding: '12px 14px', background: '#fff' }}>
-                      <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, background: v.color, flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 5 }}>{vChip(v)}<span style={{ fontSize: 11.5, color: MUTED }}>{fmtDate(u.date)}</span></div>
-                        <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{u.text}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button onClick={() => setEditing({ id: u.id, vendorId: u.vendorId, date: u.date, text: u.text })} title="Edit" style={iconBtn}>✎</button>
-                        <button onClick={() => deleteUpdate(u)} title="Delete" style={{ ...iconBtn, color: '#A32D2D' }}>×</button>
-                      </div>
-                    </div>
-                  )
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           </>
@@ -215,6 +237,7 @@ const btnPrimary = { height: 32, padding: '0 14px', border: 'none', borderRadius
 const btnSoft = { height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
 const btnGhost = { height: 32, padding: '0 14px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.2)', background: '#fff', color: TEXT, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }
 const iconBtn = { background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '2px 5px' }
+const fpill = (on) => ({ padding: '4px 11px', borderRadius: 999, border: '0.5px solid ' + (on ? NAVY : 'rgba(0,0,0,0.15)'), background: on ? NAVY : '#fff', color: on ? '#fff' : MUTED, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
 const inp = { height: 34, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 10px', fontSize: 13, background: '#fff', color: TEXT, fontFamily: 'inherit', boxSizing: 'border-box' }
 const menu = { position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 230, background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 11, boxShadow: '0 12px 30px rgba(0,0,0,0.16)', padding: 6, zIndex: 30 }
 const menuItem = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 7, fontSize: 12.5, cursor: 'pointer', color: TEXT }
