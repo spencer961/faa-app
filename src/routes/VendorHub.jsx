@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import Header from '../components/Header.jsx'
 import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
-import { activeVendors, vendorById, vendorTypeName } from '../lib/vendors.js'
+import { activeVendors, vendorById, vendorTypeName, abbrOf, clientVendorLinks } from '../lib/vendors.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Vendor Hub — per-client vendor status / pre-meeting briefing. For now:
@@ -32,7 +32,7 @@ export default function VendorHub() {
   useEffect(() => {
     ;(async () => {
       const { data: cs } = await supabase.from('clients').select('id,name,info,status').order('id')
-      if (Array.isArray(cs)) { setClients(cs); setSel((s) => s || (cs[0] && cs[0].id) || null) }
+      if (Array.isArray(cs)) setClients(cs) // sel stays null = All clients summary (unless a ?client= was passed)
       const { data: st } = await supabase.from('app_state').select('data').eq('id', STATE_ID).maybeSingle()
       setVendors(st?.data?.vendors || [])
     })()
@@ -63,13 +63,16 @@ export default function VendorHub() {
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Vendor Updates" back="/" right={
-        <select value={sel || ''} onChange={(e) => setSel(parseInt(e.target.value))} style={{ height: 32, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 10px', fontSize: 13, background: '#fff', color: TEXT, fontFamily: 'inherit', cursor: 'pointer' }}>
+        <select value={sel || ''} onChange={(e) => setSel(e.target.value ? parseInt(e.target.value) : null)} style={{ height: 32, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 10px', fontSize: 13, background: '#fff', color: TEXT, fontFamily: 'inherit', cursor: 'pointer' }}>
+          <option value="">All clients</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       } />
-      <div style={{ maxWidth: 820, margin: '0 auto', padding: '22px 20px 60px' }}>
-        {!client ? <div style={{ textAlign: 'center', color: MUTED, padding: 40, fontStyle: 'italic' }}>Loading…</div> : (
+      <div style={{ maxWidth: sel === null ? 940 : 820, margin: '0 auto', padding: '22px 20px 60px' }}>
+        {sel === null ? <AllClientsSummary clients={clients} vendors={vendors} onPick={setSel} />
+          : !client ? <div style={{ textAlign: 'center', color: MUTED, padding: 40, fontStyle: 'italic' }}>Loading…</div> : (
           <>
+            <button onClick={() => setSel(null)} style={{ background: 'none', border: 'none', color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, marginBottom: 12 }}>← All clients</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
               <div style={{ width: 42, height: 42, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, flexShrink: 0 }}>{ini(client.name)}</div>
               <div><div style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{client.name}</div><div style={{ fontSize: 12, color: MUTED }}>Vendor status &amp; updates</div></div>
@@ -161,7 +164,47 @@ export default function VendorHub() {
   )
 }
 
+// The all-clients overview — vendor status for everyone, filterable, click to open.
+function AllClientsSummary({ clients, vendors, onPick }) {
+  const [q, setQ] = useState('')
+  const act = activeVendors(vendors)
+  const rows = clients.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()))
+  const abbr = (v) => <span key={v.id} title={v.name} style={{ fontSize: 10.5, fontWeight: 700, color: '#fff', background: v.color || NAVY, borderRadius: 5, padding: '1px 6px' }}>{abbrOf(v)}</span>
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div><div style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>All clients</div><div style={{ fontSize: 12, color: MUTED }}>Vendor status across every client — click one to open its hub.</div></div>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter clients…" style={{ marginLeft: 'auto', height: 32, width: 200, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 11px', fontSize: 13, background: '#fff', color: TEXT, fontFamily: 'inherit' }} />
+      </div>
+      <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr><th style={th}>Client</th><th style={th}>Vendors</th><th style={th}>Latest update</th><th style={{ ...th, width: 70 }} /></tr></thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={4} style={{ padding: 30, textAlign: 'center', color: MUTED, fontStyle: 'italic' }}>No clients match.</td></tr>}
+            {rows.map((c) => {
+              const ids = clientVendorLinks(c).map((l) => l.vendorId)
+              const vs = act.filter((v) => ids.includes(v.id))
+              const ups = [...(c.info?.vendorUpdates || [])].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+              const last = ups[0]; const lv = last ? vendorById(vendors, last.vendorId) : null
+              return (
+                <tr key={c.id} onClick={() => onPick(c.id)} style={{ cursor: 'pointer', borderTop: '0.5px solid rgba(0,0,0,0.06)' }}>
+                  <td style={{ ...td, fontWeight: 600 }}>{c.name}</td>
+                  <td style={td}>{vs.length ? <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>{vs.map(abbr)}</span> : <span style={{ color: MUTED, fontStyle: 'italic' }}>none linked</span>}</td>
+                  <td style={td}>{last ? <span><span style={{ color: MUTED }}>{fmtDate(last.date)} · </span>{lv ? abbrOf(lv) + ': ' : ''}{last.text.length > 64 ? last.text.slice(0, 64) + '…' : last.text}</span> : <span style={{ color: MUTED }}>—</span>}</td>
+                  <td style={{ ...td, textAlign: 'right' }}><span style={{ color: NAVY, fontWeight: 600, whiteSpace: 'nowrap' }}>Open →</span></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
 const card = { background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 14, padding: '16px 18px' }
+const th = { textAlign: 'left', padding: '9px 14px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: MUTED, background: '#f9f8f6', borderBottom: '0.5px solid rgba(0,0,0,0.08)' }
+const td = { padding: '11px 14px', fontSize: 12.5, color: TEXT, verticalAlign: 'middle' }
 const secTitle = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED }
 const btnPrimary = { height: 32, padding: '0 14px', border: 'none', borderRadius: 8, background: NAVY, color: GOLD, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
 const btnSoft = { height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px solid rgba(11,29,94,0.16)', background: 'rgba(11,29,94,0.055)', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
