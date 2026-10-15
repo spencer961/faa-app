@@ -54,7 +54,12 @@ export default function VendorHub() {
   }
   const linkVendor = (vid) => { patchClient({ vendorIds: [...linkedIds, vid] }); setLinkMenu(false) }
   const unlinkVendor = (vid) => { const v = vendorById(vendors, vid); if (!window.confirm('Unlink ' + (v?.name || 'this vendor') + ' from ' + client.name + '? Past updates stay in the log.')) return; patchClient({ vendorIds: linkedIds.filter((x) => x !== vid) }) }
-  const addUpdate = () => { if (!form.vendorId || !form.text.trim()) return; patchClient({ vendorUpdates: [...allUpdates, { id: uid(), vendorId: form.vendorId, date: form.date, text: form.text.trim(), createdAt: new Date().toISOString() }] }); setForm({ vendorId: '', date: today(), text: '' }); setAdding(false) }
+  const addUpdate = () => {
+    if (!form.vendorId || !form.text.trim()) return
+    const patchObj = { vendorUpdates: [...allUpdates, { id: uid(), vendorId: form.vendorId, date: form.date, text: form.text.trim(), createdAt: new Date().toISOString() }] }
+    if (!linkedIds.includes(form.vendorId)) patchObj.vendorIds = [...linkedIds, form.vendorId] // adding an update auto-links the vendor
+    patchClient(patchObj); setForm({ vendorId: '', date: today(), text: '' }); setAdding(false)
+  }
   const saveEdit = () => { if (!editing.text.trim()) return; patchClient({ vendorUpdates: allUpdates.map((u) => (u.id === editing.id ? { ...u, vendorId: editing.vendorId, date: editing.date, text: editing.text.trim() } : u)) }); setEditing(null) }
   const deleteUpdate = (u) => { if (!window.confirm('Delete this update?')) return; patchClient({ vendorUpdates: allUpdates.filter((x) => x.id !== u.id) }) }
 
@@ -107,7 +112,7 @@ export default function VendorHub() {
             <div style={card}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                 <span style={secTitle}>Latest updates</span>
-                {linked.length > 0 && <button onClick={() => { setAdding((o) => !o); setForm({ vendorId: linked[0]?.id || '', date: today(), text: '' }) }} style={{ ...btnPrimary, marginLeft: 'auto' }}>+ Add update</button>}
+                <button onClick={() => { setAdding((o) => !o); setForm({ vendorId: activeVendors(vendors)[0]?.id || '', date: today(), text: '' }) }} style={{ ...btnPrimary, marginLeft: 'auto' }}>+ Add update</button>
               </div>
 
               {adding && (
@@ -115,7 +120,7 @@ export default function VendorHub() {
                   <div style={{ display: 'flex', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
                     <select value={form.vendorId} onChange={(e) => setForm({ ...form, vendorId: e.target.value })} style={inp}>
                       <option value="">Which vendor…</option>
-                      {linked.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                      {activeVendors(vendors).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                     </select>
                     <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ ...inp, maxWidth: 160 }} />
                   </div>
@@ -134,7 +139,7 @@ export default function VendorHub() {
                   if (editing && editing.id === u.id) return (
                     <div key={u.id} style={{ border: '0.5px solid ' + NAVY, borderRadius: 11, padding: 13, background: '#fbfcff' }}>
                       <div style={{ display: 'flex', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
-                        <select value={editing.vendorId} onChange={(e) => setEditing({ ...editing, vendorId: e.target.value })} style={inp}>{linked.map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}</select>
+                        <select value={editing.vendorId} onChange={(e) => setEditing({ ...editing, vendorId: e.target.value })} style={inp}>{activeVendors(vendors).map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}</select>
                         <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} style={{ ...inp, maxWidth: 160 }} />
                       </div>
                       <textarea value={editing.text} onChange={(e) => setEditing({ ...editing, text: e.target.value })} style={{ ...inp, width: '100%', minHeight: 60, resize: 'vertical' }} />
