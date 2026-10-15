@@ -16,6 +16,20 @@ import { uid as vuid, VENDOR_TYPES, VENDOR_PALETTE, abbrOf, vendorContacts } fro
 
 const STATE_ID = 'gmj_main'
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+const MENU = [
+  { group: 'Live' },
+  { id: 'tiers', label: 'Membership tiers' },
+  { id: 'access', label: 'Tier access' },
+  { id: 'vendors', label: 'Vendors' },
+  { id: 'pricing', label: 'Pricing' },
+  { id: 'data', label: 'Data & backups' },
+  { id: 'branding', label: 'Branding' },
+  { group: 'Coming soon' },
+  { id: 'guides', label: 'Guides & products' },
+  { id: 'team', label: 'Team & roles' },
+  { id: 'approvals', label: 'Approvals' },
+  { id: 'integrations', label: 'Integrations' },
+]
 
 export default function SuperAdmin() {
   const [data, setData] = useState(null)
@@ -24,6 +38,7 @@ export default function SuperAdmin() {
   const [newTier, setNewTier] = useState('')
   const [newVendor, setNewVendor] = useState('')
   const [openVendor, setOpenVendor] = useState(null)
+  const [tab, setTab] = useState('tiers')
 
   useEffect(() => {
     ;(async () => {
@@ -106,14 +121,19 @@ export default function SuperAdmin() {
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
       <Header sub="Super Admin" back="/" />
-      <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 20px 60px' }}>
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, color: TEXT, margin: 0 }}>Super Admin</h1>
-          <p style={{ fontSize: 13, color: MUTED, marginTop: 4, lineHeight: 1.6 }}>Your control panel for running the business and offering new services. Sections marked <Badge tone="live">Live</Badge> work now; <Badge tone="planned">Planned</Badge> ones show what we’ll wire up with logins, payments, and the guide store.</p>
-        </div>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '22px 20px 60px' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 600, color: TEXT, margin: '0 0 18px' }}>Super Admin</h1>
+        <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <nav style={{ width: 210, flexShrink: 0, position: 'sticky', top: 74, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {MENU.map((m, i) => m.group
+              ? <div key={'g' + i} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, padding: i === 0 ? '2px 10px 6px' : '16px 10px 6px' }}>{m.group}</div>
+              : <button key={m.id} onClick={() => setTab(m.id)} style={{ textAlign: 'left', padding: '9px 12px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: tab === m.id ? 600 : 500, background: tab === m.id ? NAVY : 'transparent', color: tab === m.id ? '#fff' : TEXT }}>{m.label}</button>
+            )}
+          </nav>
+          <div style={{ flex: 1, minWidth: 0 }}>
 
         {/* Membership tiers — LIVE */}
-        <Section title="Membership tiers" tone="live" desc="The categories a client can belong to. Used across the dashboard (tagging) and the client portal (what they can see).">
+        <Section show={tab === 'tiers'} title="Membership tiers" tone="live" desc="The categories a client can belong to. Used across the dashboard (tagging) and the client portal (what they can see).">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {tiers.map((t) => (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 8, background: '#fff' }}>
@@ -131,7 +151,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Access matrix — LIVE */}
-        <Section title="What each tier can access" tone="live" desc="Turn modules on or off per tier. A client sees a module if any of their tiers unlocks it.">
+        <Section show={tab === 'access'} title="What each tier can access" tone="live" desc="Turn modules on or off per tier. A client sees a module if any of their tiers unlocks it.">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 460 }}>
               <thead>
@@ -157,7 +177,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Vendors — LIVE (shared directory) */}
-        <Section title="Vendors" tone="live" desc="Your shared list of marketing companies, SEO companies and other vendors. Many clients can use the same vendor — each client links to the ones they use (on their Metrics). Archive a vendor when it's no longer used; its past numbers keep their label.">
+        <Section show={tab === 'vendors'} title="Vendors" tone="live" desc="Your shared list of marketing companies, SEO companies and other vendors. Many clients can use the same vendor — each client links to the ones they use (on their Metrics). Archive a vendor when it's no longer used; its past numbers keep their label.">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {vendors.length === 0 && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic' }}>No vendors yet — add your first marketing or SEO company below.</div>}
             {vendors.map((v) => {
@@ -209,7 +229,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Pricing — LIVE (stored, not yet charged) */}
-        <Section title="Pricing" tone="live" desc="Your standard rates. These are reference figures for now — they’ll feed Stripe checkout once payments are wired up.">
+        <Section show={tab === 'pricing'} title="Pricing" tone="live" desc="Your standard rates. These are reference figures for now — they’ll feed Stripe checkout once payments are wired up.">
           {priceRow('consulting', '1-on-1 Consulting', 'Per month')}
           {priceRow('community', 'Community membership', 'Per month')}
           {priceRow('lifetime', 'Lifetime All-Access', 'One-time')}
@@ -217,7 +237,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Guides / products — PLANNED */}
-        <Section title="Guides & products" tone="planned" desc="The catalogue you sell — courses, guides, and add-ons. Each will have a price, the tiers that include it, and whether unlocking it needs your approval.">
+        <Section show={tab === 'guides'} title="Guides & products" tone="planned" desc="The catalogue you sell — courses, guides, and add-ons. Each will have a price, the tiers that include it, and whether unlocking it needs your approval.">
           <PlannedList items={[
             ['Full-Arch Playbook', 'Included in Lifetime · $499 standalone'],
             ['Metrics Mastery Course', 'Community add-on · needs approval'],
@@ -227,7 +247,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Team & roles — PLANNED */}
-        <Section title="Team & roles" tone="planned" desc="Who can log in and what they can do. Activates when we add real logins.">
+        <Section show={tab === 'team'} title="Team & roles" tone="planned" desc="Who can log in and what they can do. Activates when we add real logins.">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <RoleRow name="You" role="Super admin" note="Full control — everything on this page" />
             <RoleRow name="Regular admin" role="Admin" note="Manage clients & content, but big changes need your approval" />
@@ -236,7 +256,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Approvals — PLANNED */}
-        <Section title="Approvals & permissions" tone="planned" desc="What a regular admin can do on their own vs. what needs a super-admin sign-off.">
+        <Section show={tab === 'approvals'} title="Approvals & permissions" tone="planned" desc="What a regular admin can do on their own vs. what needs a super-admin sign-off.">
           <PlannedToggle label="Unlocking a paid guide for a client" on />
           <PlannedToggle label="Giving a discount over 15%" on />
           <PlannedToggle label="Deleting a client" on />
@@ -244,7 +264,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Integrations — PLANNED */}
-        <Section title="Integrations" tone="planned" desc="Connect the outside tools the business runs on.">
+        <Section show={tab === 'integrations'} title="Integrations" tone="planned" desc="Connect the outside tools the business runs on.">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
             <IntegrationCard name="Stripe" desc="Payments & subscriptions" />
             <IntegrationCard name="Email marketing" desc="Nurture buyers & prospects" />
@@ -254,7 +274,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Data & backups — export is LIVE */}
-        <Section title="Data & backups" tone="live" desc="Download a full snapshot of your data. Weekly automatic backups and one-click restore come with the database hardening step.">
+        <Section show={tab === 'data'} title="Data & backups" tone="live" desc="Download a full snapshot of your data. Weekly automatic backups and one-click restore come with the database hardening step.">
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <button onClick={exportBackup} style={btnP}>↓ Export backup (.json)</button>
             <button disabled style={{ ...btnS, opacity: 0.5, cursor: 'not-allowed' }}>Import / restore (planned)</button>
@@ -263,7 +283,7 @@ export default function SuperAdmin() {
         </Section>
 
         {/* Branding — LIVE */}
-        <Section title="Branding" tone="live" desc="How the app presents itself.">
+        <Section show={tab === 'branding'} title="Branding" tone="live" desc="How the app presents itself.">
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: TEXT }}>
               Business name
@@ -275,6 +295,8 @@ export default function SuperAdmin() {
             </label>
           </div>
         </Section>
+          </div>
+        </div>
       </div>
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: NAVY, color: '#fff', fontSize: 12, padding: '8px 18px', borderRadius: 20, zIndex: 999 }}>{toast}</div>}
     </div>
@@ -291,7 +313,8 @@ function Badge({ tone, children }) {
   return <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 7px', borderRadius: 6, background: live ? 'rgba(24,168,102,0.12)' : 'rgba(188,151,98,0.14)', color: live ? '#18734a' : '#8a6a3c' }}>{children}</span>
 }
 
-function Section({ title, tone, desc, children }) {
+function Section({ title, tone, desc, children, show = true }) {
+  if (!show) return null
   return (
     <div style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12, padding: '18px 20px', marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
