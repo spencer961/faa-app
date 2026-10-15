@@ -4,6 +4,7 @@ import Header from '../components/Header.jsx'
 import { NAVY, GOLD, BG, TEXT, MUTED } from '../lib/theme.js'
 import { supabase } from '../lib/supabase.js'
 import { activeVendors, vendorById, vendorTypeName, abbrOf, clientVendorLinks } from '../lib/vendors.js'
+import { isArchived } from '../lib/archive.js'
 
 // ─────────────────────────────────────────────────────────────────────
 // Vendor Hub — per-client vendor status / pre-meeting briefing. For now:
@@ -26,8 +27,7 @@ export default function VendorHub() {
   const [sel, setSel] = useState(searchParams.get('client') ? parseInt(searchParams.get('client')) : null)
   const [linkMenu, setLinkMenu] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ vendorId: '', date: today(), text: '' })
-  const [editing, setEditing] = useState(null) // update being edited
+  const [editing, setEditing] = useState(null) // update being edited (the full update object)
   const [updFilter, setUpdFilter] = useState('all') // vendorId or 'all' — filters the history
 
   useEffect(() => {
@@ -40,6 +40,7 @@ export default function VendorHub() {
   }, [])
 
   const client = clients.find((c) => c.id === sel)
+  const activeClients = clients.filter((c) => !isArchived(c)) // archived clients drop out of Vendor Updates, like the rest of the app
   const linkedIds = client?.info?.vendorIds || []
   const linked = activeVendors(vendors).filter((v) => linkedIds.includes(v.id))
   const available = activeVendors(vendors).filter((v) => !linkedIds.includes(v.id))
@@ -60,14 +61,30 @@ export default function VendorHub() {
   }
   const linkVendor = (vid) => { patchClient({ vendorIds: [...linkedIds, vid] }); setLinkMenu(false) }
   const unlinkVendor = (vid) => { const v = vendorById(vendors, vid); if (!window.confirm('Unlink ' + (v?.name || 'this vendor') + ' from ' + client.name + '? Past updates stay in the log.')) return; patchClient({ vendorIds: linkedIds.filter((x) => x !== vid) }) }
-  const addUpdate = () => {
-    if (!form.vendorId || !form.text.trim()) return
-    const patchObj = { vendorUpdates: [...allUpdates, { id: uid(), vendorId: form.vendorId, date: form.date, text: form.text.trim(), createdAt: new Date().toISOString() }] }
-    if (!linkedIds.includes(form.vendorId)) patchObj.vendorIds = [...linkedIds, form.vendorId] // adding an update auto-links the vendor
-    patchClient(patchObj); setForm({ vendorId: '', date: today(), text: '' }); setAdding(false)
+  // Multi-client aware writes — a tagged update lives (in sync) on each client.
+  async function applyToClients(ids, transform) {
+    const next = clients.filter((c) => ids.includes(c.id)).map((c) => ({ id: c.id, info: { ...(c.info || {}), ...transform(c.info || {}) } }))
+    setClients((cs) => cs.map((x) => { const n = next.find((y) => y.id === x.id); return n ? { ...x, info: n.info } : x }))
+    for (const n of next) await supabase.from('clients').update({ info: n.info, updated_at: new Date().toISOString() }).eq('id', n.id)
   }
-  const saveEdit = () => { if (!editing.text.trim()) return; patchClient({ vendorUpdates: allUpdates.map((u) => (u.id === editing.id ? { ...u, vendorId: editing.vendorId, date: editing.date, text: editing.text.trim() } : u)) }); setEditing(null) }
-  const deleteUpdate = (u) => { if (!window.confirm('Delete this update?')) return; patchClient({ vendorUpdates: allUpdates.filter((x) => x.id !== u.id) }) }
+  const writeUpdateToClients = (update, ids) => applyToClients(ids, (info) => {
+    const list = (info.vendorUpdates || []).filter((u) => u.id !== update.id)
+    const vIds = info.vendorIds || []
+    const linkPatch = update.vendorId && !vIds.includes(update.vendorId) ? { vendorIds: [...vIds, update.vendorId] } : {} // auto-link the vendor on each tagged client
+    return { vendorUpdates: [...list, update], ...linkPatch }
+  })
+  const removeUpdateFromClients = (id, ids) => applyToClients(ids, (info) => ({ vendorUpdates: (info.vendorUpdates || []).filter((u) => u.id !== id) }))
+  const mkUpdate = (f, id, createdAt) => ({ id, vendorId: f.vendorId, date: f.date, text: f.text.trim(), link: (f.link || '').trim() || null, from: (f.from || '').trim() || null, related: (f.related || '').trim() || null, clientIds: Array.from(new Set([sel, ...(f.clientIds || [])])), createdAt })
+  const handleAdd = (f) => { const u = mkUpdate(f, uid(), new Date().toISOString()); writeUpdateToClients(u, u.clientIds); setAdding(false) }
+  const handleEdit = (f) => {
+    const u = mkUpdate(f, editing.id, editing.createdAt || new Date().toISOString())
+    const oldIds = editing.clientIds && editing.clientIds.length ? editing.clientIds : [sel]
+    const removed = oldIds.filter((id) => !u.clientIds.includes(id))
+    if (removed.length) removeUpdateFromClients(u.id, removed)
+    writeUpdateToClients(u, u.clientIds); setEditing(null)
+  }
+  const deleteUpdate = (u) => { const ids = u.clientIds && u.clientIds.length ? u.clientIds : [sel]; if (!window.confirm('Delete this update?' + (ids.length > 1 ? ' It will be removed from all ' + ids.length + ' tagged clients.' : ''))) return; removeUpdateFromClients(u.id, ids) }
+  const clientName = (id) => (clients.find((c) => c.id === id) || {}).name || 'client'
 
   const vChip = (v, extra) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: '#fff', background: v.color || NAVY, borderRadius: 999, padding: '2px 10px' }}>{v.name}{extra}</span>
 
@@ -76,11 +93,11 @@ export default function VendorHub() {
       <Header sub="Vendor Updates" back="/" right={
         <select value={sel || ''} onChange={(e) => setSel(e.target.value ? parseInt(e.target.value) : null)} style={{ height: 32, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 10px', fontSize: 13, background: '#fff', color: TEXT, fontFamily: 'inherit', cursor: 'pointer' }}>
           <option value="">All clients</option>
-          {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {activeClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       } />
       <div style={{ maxWidth: sel === null ? 940 : 820, margin: '0 auto', padding: '22px 20px 60px' }}>
-        {sel === null ? <AllClientsSummary clients={clients} vendors={vendors} onPick={setSel} />
+        {sel === null ? <AllClientsSummary clients={activeClients} vendors={vendors} onPick={setSel} />
           : !client ? <div style={{ textAlign: 'center', color: MUTED, padding: 40, fontStyle: 'italic' }}>Loading…</div> : (
           <>
             <button onClick={() => setSel(null)} style={{ background: 'none', border: 'none', color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, marginBottom: 12 }}>← All clients</button>
@@ -118,24 +135,13 @@ export default function VendorHub() {
             <div style={card}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                 <span style={secTitle}>Updates history{updates.length > 0 ? ' · ' + updates.length : ''}</span>
-                <button onClick={() => { setAdding((o) => !o); setForm({ vendorId: activeVendors(vendors)[0]?.id || '', date: today(), text: '' }) }} style={{ ...btnPrimary, marginLeft: 'auto' }}>+ Add update</button>
+                <button onClick={() => { setEditing(null); setAdding((o) => !o) }} style={{ ...btnPrimary, marginLeft: 'auto' }}>+ Add update</button>
               </div>
 
               {adding && (
-                <div style={{ border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 11, padding: 13, marginBottom: 14, background: '#fbfbfa' }}>
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
-                    <select value={form.vendorId} onChange={(e) => setForm({ ...form, vendorId: e.target.value })} style={inp}>
-                      <option value="">Which vendor…</option>
-                      {activeVendors(vendors).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select>
-                    <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ ...inp, maxWidth: 160 }} />
-                  </div>
-                  <textarea value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} placeholder="What's the update? (e.g. launched new All-on-4 campaign; +12 backlinks, traffic up 18%)" style={{ ...inp, width: '100%', minHeight: 60, resize: 'vertical' }} />
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 9 }}>
-                    <button onClick={() => setAdding(false)} style={btnGhost}>Cancel</button>
-                    <button onClick={addUpdate} style={btnPrimary}>Save update</button>
-                  </div>
-                </div>
+                <UpdateForm
+                  initial={{ vendorId: activeVendors(vendors)[0]?.id || '', date: today(), text: '', link: '', from: '', related: '', clientIds: [sel] }}
+                  vendors={vendors} activeClients={activeClients} sel={sel} onCancel={() => setAdding(false)} onSave={handleAdd} />
               )}
 
               {updates.length === 0 && !adding && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic' }}>No updates logged yet. Click “+ Add update” to log what a vendor has reported.</div>}
@@ -156,24 +162,28 @@ export default function VendorHub() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {g.items.map((u) => { const v = vendorById(vendors, u.vendorId) || { name: 'Unknown vendor', color: '#9a9a96' }
                         if (editing && editing.id === u.id) return (
-                          <div key={u.id} style={{ border: '0.5px solid ' + NAVY, borderRadius: 11, padding: 13, background: '#fbfcff' }}>
-                            <div style={{ display: 'flex', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
-                              <select value={editing.vendorId} onChange={(e) => setEditing({ ...editing, vendorId: e.target.value })} style={inp}>{activeVendors(vendors).map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}</select>
-                              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} style={{ ...inp, maxWidth: 160 }} />
-                            </div>
-                            <textarea value={editing.text} onChange={(e) => setEditing({ ...editing, text: e.target.value })} style={{ ...inp, width: '100%', minHeight: 60, resize: 'vertical' }} />
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 9 }}><button onClick={() => setEditing(null)} style={btnGhost}>Cancel</button><button onClick={saveEdit} style={btnPrimary}>Save</button></div>
-                          </div>
+                          <UpdateForm key={u.id}
+                            initial={{ vendorId: u.vendorId, date: u.date, text: u.text, link: u.link || '', from: u.from || '', related: u.related || '', clientIds: u.clientIds || [sel] }}
+                            vendors={vendors} activeClients={activeClients} sel={sel} onCancel={() => setEditing(null)} onSave={handleEdit} />
                         )
+                        const others = (u.clientIds || []).filter((id) => id !== sel)
                         return (
                           <div key={u.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 11, padding: '12px 14px', background: '#fff' }}>
                             <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, background: v.color, flexShrink: 0 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 5 }}>{vChip(v)}<span style={{ fontSize: 11.5, color: MUTED }}>{fmtDate(u.date)}</span></div>
                               <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{u.text}</div>
+                              {(u.from || u.related || u.link) && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 6, fontSize: 11.5, color: MUTED }}>
+                                  {u.from && <span><span style={{ color: '#a0a09e' }}>from</span> {u.from}</span>}
+                                  {u.related && <span>· {u.related}</span>}
+                                  {u.link && <a href={u.link} target="_blank" rel="noopener" style={{ color: NAVY, fontWeight: 600, textDecoration: 'none' }}>View email thread ↗</a>}
+                                </div>
+                              )}
+                              {others.length > 0 && <div style={{ marginTop: 6, fontSize: 11, color: '#0f7a49' }}>⤷ also tagged: {others.map(clientName).join(', ')}</div>}
                             </div>
                             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                              <button onClick={() => setEditing({ id: u.id, vendorId: u.vendorId, date: u.date, text: u.text })} title="Edit" style={iconBtn}>✎</button>
+                              <button onClick={() => { setAdding(false); setEditing(u) }} title="Edit" style={iconBtn}>✎</button>
                               <button onClick={() => deleteUpdate(u)} title="Delete" style={{ ...iconBtn, color: '#A32D2D' }}>×</button>
                             </div>
                           </div>
@@ -186,6 +196,42 @@ export default function VendorHub() {
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Shared add/edit form — summary + email link + from + related + multi-client tag.
+function UpdateForm({ initial, vendors, activeClients, sel, onCancel, onSave }) {
+  const [f, setF] = useState(initial)
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
+  const others = activeClients.filter((c) => c.id !== sel)
+  const toggle = (id) => setF((s) => ({ ...s, clientIds: s.clientIds.includes(id) ? s.clientIds.filter((x) => x !== id) : [...s.clientIds, id] }))
+  const selName = (activeClients.find((c) => c.id === sel) || {}).name || 'this client'
+  return (
+    <div style={{ border: '0.5px solid ' + NAVY, borderRadius: 11, padding: 13, marginBottom: 14, background: '#fbfcff' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
+        <select value={f.vendorId} onChange={(e) => set('vendorId', e.target.value)} style={inp}><option value="">Which vendor…</option>{activeVendors(vendors).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>
+        <input type="date" value={f.date} onChange={(e) => set('date', e.target.value)} style={{ ...inp, maxWidth: 160 }} />
+      </div>
+      <textarea value={f.text} onChange={(e) => set('text', e.target.value)} placeholder="Summary — what's the update? (e.g. launched new All-on-4 campaign; +12 backlinks, traffic up 18%)" style={{ ...inp, width: '100%', minHeight: 60, resize: 'vertical', marginBottom: 8 }} />
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <input value={f.from} onChange={(e) => set('from', e.target.value)} placeholder="From (who sent it)" style={{ ...inp, flex: '1 1 150px' }} />
+        <input value={f.link} onChange={(e) => set('link', e.target.value)} placeholder="Email thread link (optional)" style={{ ...inp, flex: '1 1 200px' }} />
+      </div>
+      <input value={f.related} onChange={(e) => set('related', e.target.value)} placeholder="Who else was on it / related (optional)" style={{ ...inp, width: '100%', marginBottom: others.length ? 10 : 2 }} />
+      {others.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Tag clients — the update also shows on each one you pick:</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ ...tagPill(true), cursor: 'default', opacity: 0.8 }}>{selName}</span>
+            {others.map((c) => <button key={c.id} onClick={() => toggle(c.id)} style={tagPill(f.clientIds.includes(c.id))}>{c.name}</button>)}
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button onClick={onCancel} style={btnGhost}>Cancel</button>
+        <button onClick={() => { if (!f.vendorId || !f.text.trim()) return; onSave(f) }} style={btnPrimary}>Save update</button>
       </div>
     </div>
   )
@@ -238,6 +284,7 @@ const btnSoft = { height: 30, padding: '0 12px', borderRadius: 8, border: '0.5px
 const btnGhost = { height: 32, padding: '0 14px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.2)', background: '#fff', color: TEXT, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }
 const iconBtn = { background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '2px 5px' }
 const fpill = (on) => ({ padding: '4px 11px', borderRadius: 999, border: '0.5px solid ' + (on ? NAVY : 'rgba(0,0,0,0.15)'), background: on ? NAVY : '#fff', color: on ? '#fff' : MUTED, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
+const tagPill = (on) => ({ padding: '4px 11px', borderRadius: 999, border: '0.5px solid ' + (on ? '#0f7a49' : 'rgba(0,0,0,0.18)'), background: on ? '#E1F5EE' : '#fff', color: on ? '#0f7a49' : MUTED, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
 const inp = { height: 34, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 8, padding: '0 10px', fontSize: 13, background: '#fff', color: TEXT, fontFamily: 'inherit', boxSizing: 'border-box' }
 const menu = { position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 230, background: '#fff', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 11, boxShadow: '0 12px 30px rgba(0,0,0,0.16)', padding: 6, zIndex: 30 }
 const menuItem = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 7, fontSize: 12.5, cursor: 'pointer', color: TEXT }
