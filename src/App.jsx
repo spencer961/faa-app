@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Home from './routes/Home.jsx'
 import Onboarding from './routes/Onboarding.jsx'
 import Dashboard from './routes/Dashboard.jsx'
@@ -7,7 +7,6 @@ import Metrics from './routes/Metrics.jsx'
 import Tasks from './routes/Tasks.jsx'
 import ClientPortal from './routes/ClientPortal.jsx'
 import SuperAdmin from './routes/SuperAdmin.jsx'
-import ClientPulse from './routes/ClientPulse.jsx'
 import ContentLibrary from './routes/ContentLibrary.jsx'
 import VendorHub from './routes/VendorHub.jsx'
 import Login, { Splash } from './routes/Login.jsx'
@@ -32,7 +31,8 @@ export default function App() {
       <Route path="/metrics" element={<Metrics />} />
       <Route path="/tasks" element={<Tasks />} />
       <Route path="/portal" element={<ClientPortal />} />
-      <Route path="/pulse" element={<ClientPulse />} />
+      {/* Client Pulse merged into Client Updates — keep old links working. */}
+      <Route path="/pulse" element={<Navigate to="/vendor-hub" replace />} />
       <Route path="/content" element={<ContentLibrary />} />
       <Route path="/vendor-hub" element={<VendorHub />} />
       <Route path="/admin" element={<SuperAdmin />} />

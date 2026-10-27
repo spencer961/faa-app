@@ -29,9 +29,9 @@ const CAT_PALETTE = [
 ]
 const catColor = (cat) => { let h = 0; for (const ch of String(cat || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return CAT_PALETTE[h % CAT_PALETTE.length] }
 const ini = (n) => String(n || '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
-// Open the Client Pulse desk in a new tab (consultant view). Pass a clientId to
-// land on that client, or omit it for the account-wide review desk.
-const openPulseTab = (clientId) => window.open(window.location.origin + window.location.pathname + '#/pulse?mode=consultant' + (clientId ? '&client=' + clientId : ''), '_blank', 'noopener')
+// Open the client's Client Updates hub in a new tab. Pass a clientId to land on
+// that client, or omit it for the all-clients view.
+const openPulseTab = (clientId) => window.open(window.location.origin + window.location.pathname + '#/vendor-hub' + (clientId ? '?client=' + clientId : ''), '_blank', 'noopener')
 // Short name for the compact filter: a custom info.abbr if set, else the
 // acronym of the client's name.
 const abbrOf = (c) => {
@@ -1030,7 +1030,7 @@ function RvRow({ c, it, k, doneKey, onToggle }) {
 // "+N more" link that opens the full list in Client Pulse.
 const REVIEW_CAP = 5
 function MoreRow({ n, onClick }) {
-  return <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '9px 0 2px' }}>+{n} more — open Client Pulse <ArrowR /></button>
+  return <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: NAVY, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '9px 0 2px' }}>+{n} more — open Client Updates <ArrowR /></button>
 }
 
 // Quick-review popup opened from a card's "N to review" pill. Shows the client's
@@ -1056,7 +1056,7 @@ function ReviewModal({ c, onClose, onToggle, onOpenFull }) {
             <div style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{c.name}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>{openLeft > 0 ? openLeft + ' still to review' : 'All caught up'}</div>
           </div>
-          <OpenTabBtn onClick={onOpenFull} title="Open in Client Pulse (new tab)" />
+          <OpenTabBtn onClick={onOpenFull} title="Open in Client Updates (new tab)" />
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 21, lineHeight: 1, padding: '0 2px' }}>×</button>
         </div>
         <div style={{ padding: '12px 18px', overflowY: 'auto', flex: 1 }}>
@@ -1097,7 +1097,7 @@ function ReviewAllModal({ clients, onClose, onToggle, onOpenClient, onOpenDesk }
             <div style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>To review</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>{openLeft > 0 ? openLeft + ' item' + (openLeft !== 1 ? 's' : '') + ' across ' + groups.length + ' client' + (groups.length !== 1 ? 's' : '') : 'All caught up'}</div>
           </div>
-          <button onClick={onOpenDesk} title="Open the full review desk in Client Pulse" style={cpBtn}>Full desk <ArrowR /></button>
+          <button onClick={onOpenDesk} title="Open the full review desk in Client Updates" style={cpBtn}>Full desk <ArrowR /></button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 21, lineHeight: 1, padding: '0 2px' }}>×</button>
         </div>
         <div style={{ padding: '4px 18px 12px', overflowY: 'auto', flex: 1 }}>
@@ -1107,7 +1107,7 @@ function ReviewAllModal({ clients, onClose, onToggle, onOpenClient, onOpenDesk }
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 2 }}>
                 <div style={{ width: 26, height: 26, borderRadius: '50%', background: NAVY, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 10.5, flexShrink: 0 }}>{ini(c.name)}</div>
                 <span style={{ fontSize: 13.5, fontWeight: 600, color: TEXT, flex: 1, minWidth: 0 }}>{c.name}</span>
-                <OpenTabBtn onClick={() => onOpenClient(c)} title={'Open ' + c.name + ' in Client Pulse (new tab)'} size={28} />
+                <OpenTabBtn onClick={() => onOpenClient(c)} title={'Open ' + c.name + ' in Client Updates (new tab)'} size={28} />
               </div>
               {heads.length > 0 && <div style={{ marginTop: 6 }}><div style={sectionLbl('#92600b')}>Heads up</div>{heads.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="headsUp" doneKey="seen" onToggle={onToggle} />)}{heads.length > REVIEW_CAP && <MoreRow n={heads.length - REVIEW_CAP} onClick={() => onOpenClient(c)} />}</div>}
               {review.length > 0 && <div style={{ marginTop: heads.length ? 8 : 6 }}><div style={sectionLbl('#185fa5')}>To review</div>{review.slice(0, REVIEW_CAP).map((it) => <RvRow key={it.id} c={c} it={it} k="reviewItems" doneKey="done" onToggle={onToggle} />)}{review.length > REVIEW_CAP && <MoreRow n={review.length - REVIEW_CAP} onClick={() => onOpenClient(c)} />}</div>}

@@ -30,12 +30,11 @@ const I = {
 const NAV = [
   { to: '/', label: 'Home', icon: I.home, end: true },
   { to: '/dashboard', label: 'Dashboard', icon: I.dash },
-  { to: '/pulse', label: 'Client Pulse', icon: I.pulse },
   { to: '/success-map', label: 'Success Map', icon: I.map },
   { to: '/metrics', label: 'Metrics Tracker', icon: I.chart },
   { to: '/tasks', label: 'To-Do Lists', icon: I.check },
   { to: '/content', label: 'Content', icon: I.play },
-  { to: '/vendor-hub', label: 'Vendor Updates', icon: I.vendor },
+  { to: '/vendor-hub', label: 'Client Updates', icon: I.vendor },
   { group: 'Intake' },
   { to: '/onboarding', label: 'Onboarding Form', icon: I.file },
   { to: '/portal', label: 'Client Portal', icon: I.users },
