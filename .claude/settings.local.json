@@ -77,7 +77,14 @@
       "Bash(python3 -c ' *)",
       "Bash(pip3 install *)",
       "Bash(python3 -c \"import openpyxl; print\\('ok'\\)\")",
-      "Bash(cp \"/Users/bobbiejohealey/Downloads/Copy of Metrics Scorecard -.xlsx\" \"/private/tmp/claude-501/-Users-bobbiejohealey-Documents-FAA-Full-Arch-App/c6e2960d-d400-4f7c-8509-7555c79fbf5c/scratchpad/metrics.xlsx\" && echo copied && ls -la \"/private/tmp/claude-501/-Users-bobbiejohealey-Documents-FAA-Full-Arch-App/c6e2960d-d400-4f7c-8509-7555c79fbf5c/scratchpad/metrics.xlsx\")"
+      "Bash(cp \"/Users/bobbiejohealey/Downloads/Copy of Metrics Scorecard -.xlsx\" \"/private/tmp/claude-501/-Users-bobbiejohealey-Documents-FAA-Full-Arch-App/c6e2960d-d400-4f7c-8509-7555c79fbf5c/scratchpad/metrics.xlsx\" && echo copied && ls -la \"/private/tmp/claude-501/-Users-bobbiejohealey-Documents-FAA-Full-Arch-App/c6e2960d-d400-4f7c-8509-7555c79fbf5c/scratchpad/metrics.xlsx\")",
+      "Bash(npx vite *)",
+      "Bash(git rm *)",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "Bash(git reset *)",
+      "Bash(git restore *)",
+      "Bash(grep -vE \"^\\\\s*$\")",
+      "Bash(git push *)"
     ]
   }
 }
