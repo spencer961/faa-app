@@ -7,7 +7,9 @@ import { getClientMode } from '../lib/clientMode.js'
 import { isArchived } from '../lib/archive.js'
 import {
   METRICS, KEY_METRICS, INPUT_METRICS, fmtVal, benchClass, aggregate, bucketDaily, getWeekEnding, getMonthKey,
+  SOURCE_METRICS, activeSources, clientSources, sourceLabel, srcKey, isSrcKey, uidSource,
 } from '../lib/metrics.js'
+import { activeVendors } from '../lib/vendors.js'
 
 // Metrics tracker — migrated from metrics.html. Three views:
 //   Your view  — per-client performance table
@@ -25,6 +27,7 @@ const mkLabel = (k, period) => period === 'monthly' ? new Date(k + '-01T12:00:00
 
 export default function Metrics() {
   const [clients, setClients] = useState([])
+  const [vendors, setVendors] = useState([])
   const [data, setData] = useState({}) // {clientId:{period:{dateKey:{metricId:value}}}}
   const [searchParams] = useSearchParams()
   const cm = (searchParams.get('client') ? parseInt(searchParams.get('client')) : null) || getClientMode()
@@ -38,6 +41,8 @@ export default function Metrics() {
     ;(async () => {
       const { data: cs } = await supabase.from('clients').select('id,name,doctor,email,status,info').order('id')
       if (Array.isArray(cs)) setClients(cs)
+      const { data: st } = await supabase.from('app_state').select('data').eq('id', 'gmj_main').maybeSingle()
+      if (Array.isArray(st?.data?.vendors)) setVendors(st.data.vendors)
       const { data: rows } = await supabase.from('metrics_tracker').select('*')
       if (Array.isArray(rows)) {
         const md = {}
@@ -73,8 +78,8 @@ export default function Metrics() {
           </label>
         )}
         {mainView === 'yours' && <YoursView clients={visibleClients} data={data} />}
-        {mainView === 'client' && <ClientView clients={visibleClients} data={data} setData={setData} />}
-        {mainView === 'trends' && <TrendsView clients={visibleClients} data={data} />}
+        {mainView === 'client' && <ClientView clients={visibleClients} data={data} setData={setData} setClients={setClients} vendors={vendors} />}
+        {mainView === 'trends' && <TrendsView clients={visibleClients} data={data} vendors={vendors} />}
       </div>
     </div>
   )
@@ -145,7 +150,7 @@ function YoursView({ clients, data }) {
 }
 
 // ── CLIENT VIEW ────────────────────────────────────────────────────────
-function ClientView({ clients, data, setData }) {
+function ClientView({ clients, data, setData, setClients, vendors }) {
   const [cid, setCid] = useState(null)
   const [period, setPeriod] = useState('daily')
   const [date, setDate] = useState(today())
@@ -168,14 +173,17 @@ function ClientView({ clients, data, setData }) {
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
   const setField = (id, v) => { setForm((f) => ({ ...f, [id]: v })); setDirty(true) }
 
-  // live-calc from current form
-  const calcVals = aggregate([Object.fromEntries(INPUT_METRICS.map((m) => [m.id, parseFloat(form[m.id]) || 0]))])
+  // live-calc from current form (standard fields + any per-source entries)
+  const formEntry = Object.fromEntries(INPUT_METRICS.map((m) => [m.id, parseFloat(form[m.id]) || 0]))
+  Object.keys(form).forEach((k) => { if (isSrcKey(k)) formEntry[k] = parseFloat(form[k]) || 0 })
+  const calcVals = aggregate([formEntry])
 
   async function save() {
     if (!cid) return
     const client = clients.find((c) => c.id === cid)
     const clean = {}
     INPUT_METRICS.forEach((m) => { if (form[m.id] !== '' && form[m.id] !== undefined && form[m.id] !== null) clean[m.id] = parseFloat(form[m.id]) || 0 })
+    Object.keys(form).forEach((k) => { if (isSrcKey(k) && form[k] !== '' && form[k] !== undefined && form[k] !== null) clean[k] = parseFloat(form[k]) || 0 })
     await supabase.from('metrics_tracker').upsert({ client_id: cid, client_name: client?.name || '', period: 'daily', date_key: date, data: clean, responsible: {}, updated_at: new Date().toISOString() }, { onConflict: 'client_id,period,date_key' })
     setData((md) => ({ ...md, [cid]: { ...(md[cid] || {}), daily: { ...(md[cid]?.daily || {}), [date]: clean } } }))
     setDirty(false)
@@ -233,7 +241,7 @@ function ClientView({ clients, data, setData }) {
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <div className="seg-ctrl">
-            {(cadence === 'weekly' ? [['weekly', 'Weekly'], ['weeksheet', 'Weeks sheet'], ['monthly', 'Monthly']] : [['daily', 'Daily'], ['monthsheet', 'Month sheet'], ['weekly', 'Weekly'], ['monthly', 'Monthly']]).map(([p, label]) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{label}</button>)}
+            {(cadence === 'weekly' ? [['weekly', 'Weekly'], ['monthly', 'Monthly'], ['weeksheet', 'Weeks sheet']] : [['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly'], ['monthsheet', 'Month sheet']]).map(([p, label]) => <button key={p} className={'seg-btn' + (period === p ? ' active' : '')} onClick={() => setPeriod(p)}>{label}</button>)}
           </div>
         </div>
       </div>
@@ -253,9 +261,9 @@ function ClientView({ clients, data, setData }) {
           {entryList(false)}
         </div>
       ) : period === 'monthsheet' ? (
-        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} mode="daily" />
+        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} setClients={setClients} vendors={vendors} mode="daily" />
       ) : period === 'weeksheet' ? (
-        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} mode="weekly" />
+        <MonthGrid cid={cid} clients={clients} data={data} setData={setData} setClients={setClients} vendors={vendors} mode="weekly" />
       ) : period === 'weekly' && cadence === 'weekly' ? (
         <div className="entry-card narrow">
           <div className="entry-bar">
@@ -290,15 +298,19 @@ const weeksEndingAt = (fri) => Array.from({ length: WEEKS_SHOWN }, (_, i) => shi
 const dayHdr = (dk) => new Date(dk + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const colsFor = (mode, anchor) => mode === 'weekly' ? weeksEndingAt(anchor) : weekdaysOf(anchor)
 
-function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
+function MonthGrid({ cid, clients, data, setData, setClients, vendors, mode = 'daily' }) {
   const [anchor, setAnchor] = useState(mode === 'weekly' ? getWeekEnding(today()) : today().slice(0, 7))
   const [grid, setGrid] = useState({})
   const [dirty, setDirty] = useState(false)
   const [toast, setToast] = useState('')
+  const [manageSrc, setManageSrc] = useState(false)
   const weekly = mode === 'weekly'
+  const client = clients.find((c) => c.id === cid)
   // Weeks sheet includes Leads + rates; the daily sheet is the activity log only.
   const rowsMetrics = METRICS.filter((m) => weekly ? m.scope !== 'daily' : m.scope !== 'weekly')
   const cols = colsFor(mode, anchor)
+  const srcs = activeSources(client)
+  const useBreakdown = srcs.length > 0
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2500) }
 
   useEffect(() => {
@@ -308,10 +320,56 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
     setGrid(g); setDirty(false)
   }, [cid, anchor, data, mode])
 
-  const setCell = (dk, mid, v) => { setGrid((g) => ({ ...g, [dk]: { ...(g[dk] || {}), [mid]: v } })); setDirty(true) }
+  const setCell = (dk, key, v) => { setGrid((g) => ({ ...g, [dk]: { ...(g[dk] || {}), [key]: v } })); setDirty(true) }
 
-  // Paste a spreadsheet block: rows = metrics, columns = dates, anchored at the target cell.
-  const onPaste = (e, mIndex, dIndex) => {
+  // Per-column total for a source metric = sum of its per-source cells (null if blank).
+  const srcTotal = (mid, dk) => { let sum = 0, any = false; srcs.forEach((s) => { const v = grid[dk]?.[srcKey(s.id, mid)]; if (v !== '' && v !== undefined && v !== null) { sum += parseFloat(v) || 0; any = true } }); return any ? sum : null }
+  // Fold per-source leads into `leads` so the rate rows (booking rate) still compute.
+  const effective = (dk) => { const base = grid[dk] || {}; if (!useBreakdown) return base; const lt = srcTotal('leads', dk); return lt === null ? base : { ...base, leads: lt } }
+
+  // ── Lead sources — managed here, persisted on the client profile ──
+  async function saveSources(next) {
+    const info = { ...(client?.info || {}), leadSources: next }
+    await supabase.from('clients').update({ info }).eq('id', cid)
+    setClients((cs) => cs.map((x) => (x.id === cid ? { ...x, info } : x)))
+  }
+  const addSource = () => saveSources([...clientSources(client), { id: uidSource(), label: 'New source', vendorId: null, archived: false }])
+  const editSource = (id, patch) => saveSources(clientSources(client).map((s) => (s.id === id ? { ...s, ...patch } : s)))
+  const archiveSource = (id) => { if (window.confirm('Archive this lead source? Its past numbers stay in the totals, but it won’t show on new weeks.')) editSource(id, { archived: true }) }
+
+  // ── Ordered render plan: the normal metric rows, then a by-source block ──
+  // per broken-out metric (one input row per source + a computed total row).
+  const plan = []
+  let sec = null
+  rowsMetrics.forEach((m) => {
+    if (m.section !== sec) { sec = m.section; plan.push({ type: 'sec', label: SEC_LABEL[m.section] || m.section }) }
+    plan.push({ type: 'row', def: { kind: 'metric', m } })
+  })
+  if (useBreakdown) {
+    SOURCE_METRICS.forEach((mid) => {
+      plan.push({ type: 'sec', label: M(mid).label + ' — by source' })
+      srcs.forEach((s) => plan.push({ type: 'row', def: { kind: 'src', source: s, m: M(mid) } }))
+      plan.push({ type: 'row', def: { kind: 'srctotal', m: M(mid) } })
+    })
+  }
+  const dataRows = plan.filter((p) => p.type === 'row').map((p) => p.def)
+
+  // Editable rows return a storage key; computed rows (gold) return null.
+  const writeKeyOf = (def) => {
+    if (def.kind === 'srctotal') return null
+    if (def.kind === 'src') return srcKey(def.source.id, def.m.id)
+    if (def.m.calc) return null
+    if (useBreakdown && def.m.id === 'leads') return null // leads total = sum of sources
+    return def.m.id
+  }
+  const computedVal = (def, dk) => {
+    if (def.kind === 'srctotal') return srcTotal(def.m.id, dk)
+    if (def.m.calc) return def.m.calc(effective(dk))
+    return srcTotal('leads', dk) // the main Leads row when broken out by source
+  }
+
+  // Paste a block: clipboard rows map to consecutive data rows, columns to dates.
+  const onPaste = (e, riStart, dIndex) => {
     const text = e.clipboardData.getData('text')
     if (!text) return
     e.preventDefault()
@@ -319,13 +377,13 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
     setGrid((g) => {
       const ng = { ...g }
       matrix.forEach((rowVals, i) => {
-        const metric = rowsMetrics[mIndex + i]
-        if (!metric || metric.calc) return // never write into computed gold rows
+        const def = dataRows[riStart + i]
+        const key = def && writeKeyOf(def)
+        if (!key) return // computed/total row — never written into
         rowVals.forEach((raw, j) => {
           const dk = cols[dIndex + j]
           if (!dk) return
-          const clean = String(raw).trim().replace(/[$,%\s]/g, '')
-          ng[dk] = { ...(ng[dk] || {}), [metric.id]: clean }
+          ng[dk] = { ...(ng[dk] || {}), [key]: String(raw).trim().replace(/[$,%\s]/g, '') }
         })
       })
       return ng
@@ -334,11 +392,11 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
   }
 
   async function save() {
-    const client = clients.find((c) => c.id === cid)
     const rows = []
     Object.entries(grid).forEach(([dk, vals]) => {
       const clean = {}
       INPUT_METRICS.forEach((m) => { const v = vals[m.id]; if (v !== '' && v !== undefined && v !== null) clean[m.id] = parseFloat(v) || 0 })
+      Object.keys(vals).forEach((k) => { if (isSrcKey(k)) { const v = vals[k]; if (v !== '' && v !== undefined && v !== null) clean[k] = parseFloat(v) || 0 } })
       if (Object.keys(clean).length) rows.push({ client_id: cid, client_name: client?.name || '', period: 'daily', date_key: dk, data: clean, responsible: {}, updated_at: new Date().toISOString() })
     })
     if (!rows.length) { showToast('Nothing to save'); return }
@@ -348,16 +406,25 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
   }
 
   const bodyRows = []
-  let lastSec = null
-  rowsMetrics.forEach((m, mi) => {
-    if (m.section !== lastSec) { lastSec = m.section; bodyRows.push(<tr key={'sec_' + m.section} className="gt-sec"><td colSpan={cols.length + 1}>{SEC_LABEL[m.section] || m.section}</td></tr>) }
+  let ri = -1
+  plan.forEach((p, pi) => {
+    if (p.type === 'sec') { bodyRows.push(<tr key={'sec_' + pi} className="gt-sec"><td colSpan={cols.length + 1}>{p.label}</td></tr>); return }
+    const def = p.def
+    ri += 1
+    const myRi = ri
+    const key = writeKeyOf(def)
+    const computed = !key
+    const isSrc = def.kind === 'src'
+    const label = def.kind === 'srctotal' ? 'Total' : isSrc ? sourceLabel(def.source, vendors) : def.m.label
     bodyRows.push(
-      <tr key={m.id} className={m.calc ? 'gt-gold' : ''}>
-        <td className="gt-name" title={m.hint || ''}>{m.label}</td>
-        {cols.map((dk, di) => m.calc
-          ? <td key={dk} className="gt-cell gt-out">{fmtVal(m, m.calc(grid[dk] || {}))}</td>
-          : <td key={dk} className="gt-cell"><input className="gt-input" type="number" value={grid[dk]?.[m.id] ?? ''} onChange={(e) => setCell(dk, m.id, e.target.value)} onPaste={(e) => onPaste(e, mi, di)} onFocus={(e) => e.target.select()} /></td>
-        )}
+      <tr key={isSrc ? def.source.id + ':' + def.m.id : def.kind === 'srctotal' ? 'tot_' + def.m.id : def.m.id} className={def.kind === 'srctotal' || def.m.calc ? 'gt-gold' : isSrc ? 'gt-src' : ''}>
+        <td className={'gt-name' + (isSrc ? ' gt-src-name' : '')} title={def.m.hint || ''}>{label}</td>
+        {cols.map((dk, di) => {
+          if (computed) { const cv = computedVal(def, dk); return <td key={dk} className={'gt-cell gt-out' + (cv === null || cv === undefined ? ' gt-empty' : '')}>{fmtVal(def.m, cv)}</td> }
+          const raw = grid[dk]?.[key]
+          const empty = raw === '' || raw === undefined || raw === null
+          return <td key={dk} className={'gt-cell' + (empty ? ' gt-empty' : '')}><input className="gt-input" type="number" value={raw ?? ''} onChange={(e) => setCell(dk, key, e.target.value)} onPaste={(e) => onPaste(e, myRi, di)} onFocus={(e) => e.target.select()} /></td>
+        })}
       </tr>
     )
   })
@@ -376,9 +443,30 @@ function MonthGrid({ cid, clients, data, setData, mode = 'daily' }) {
           <span style={{ fontSize: 13, fontWeight: 500, minWidth: weekly ? 160 : 130, textAlign: 'center' }}>{rangeLabel}</span>
           <button className="nav-btn" onClick={next} title={weekly ? 'Later weeks' : 'Next month'}>›</button>
         </div>
-        <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save all' : 'Saved ✓'}</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="src-manage-lite" onClick={() => setManageSrc((v) => !v)}>{manageSrc ? 'Done' : useBreakdown ? 'Edit lead sources' : '+ Lead sources'}</button>
+          <button className="btn-primary" onClick={save} disabled={!dirty}>{dirty ? 'Save all' : 'Saved ✓'}</button>
+        </div>
       </div>
-      <div className="gt-note"><span>Paste columns straight from your spreadsheet — click the first {weekly ? 'week' : 'day'}’s cell for a metric, then paste. Gold rows total up automatically.</span></div>
+      {manageSrc && (
+        <div className="src-mpanel">
+          {clientSources(client).length === 0 && <div className="src-mhint">Add the sources this client gets leads from (e.g. TIE). Link one to the vendor directory so it matches the Client Updates page, or leave it as a plain label like “Referral.” Each source becomes its own row you can paste into below.</div>}
+          {clientSources(client).map((s) => (
+            <div className="src-mrow" key={s.id} style={{ opacity: s.archived ? 0.55 : 1 }}>
+              <input className="src-mname" value={s.label} onChange={(e) => editSource(s.id, { label: e.target.value })} placeholder="Source name" />
+              <select className="slim src-mvendor" value={s.vendorId || ''} onChange={(e) => editSource(s.id, { vendorId: e.target.value || null })}>
+                <option value="">— plain label —</option>
+                {activeVendors(vendors).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+              {s.archived
+                ? <button className="src-mbtn" onClick={() => editSource(s.id, { archived: false })}>Restore</button>
+                : <button className="src-mbtn danger" onClick={() => archiveSource(s.id)}>Archive</button>}
+            </div>
+          ))}
+          <button className="src-add" onClick={addSource}>+ Add lead source</button>
+        </div>
+      )}
+      <div className="gt-note"><span>Paste columns straight from your spreadsheet — click the first {weekly ? 'week' : 'day'}’s cell for a metric, then paste. Gold rows total up automatically.{useBreakdown ? ' Lead-source rows are grouped by metric at the bottom.' : ''}</span></div>
       <div className="gt-scroll">
         <table className="grid-table">
           <thead><tr><th className="gt-name-h">{weekly ? 'Weekly metric' : 'Daily metric'}</th>{cols.map((dk) => <th key={dk} className="gt-day-h">{dayHdr(dk)}</th>)}</tr></thead>
@@ -575,6 +663,13 @@ const CSS = `
 .mx .gt-gold td{background:#FAEEDA;}
 .mx .gt-gold .gt-name{background:#FAEEDA;color:#633806;}
 .mx .gt-out{font-size:12px;font-weight:600;color:#633806;padding:0 6px;text-align:center;white-space:nowrap;}
+.mx .gt-empty{background:#f4f3f1;}
+.mx .gt-gold .gt-empty{background:#f3ebdb;}
+.mx .gt-empty .gt-input{color:#b9b8b5;}
+.mx .gt-src-name{padding:7px 12px 7px 28px !important;color:#555;font-weight:400;}
+.mx .gt-src .gt-input{color:#1a1a1a;}
+.mx .src-manage-lite{height:34px;padding:0 13px;border:0.5px solid rgba(0,0,0,0.14);border-radius:8px;background:#fff;color:#0b1d5e;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;}
+.mx .src-manage-lite:hover{background:#f6f5f3;}
 .mx .progress-wrap{display:flex;align-items:center;gap:7px;}
 .mx .progress-bar{width:70px;height:6px;border-radius:3px;background:#eceae7;overflow:hidden;}
 .mx .progress-fill{height:100%;background:#0b1d5e;border-radius:3px;transition:width .3s;}
@@ -609,6 +704,32 @@ const CSS = `
 .mx .agg-table tr.calc-row td{background:rgba(11,29,94,0.025);}
 .mx .empty-state{padding:40px;text-align:center;color:#888786;font-size:13px;font-style:italic;}
 .mx .chart-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.mx .src-block{margin:12px 16px 4px;border:0.5px solid rgba(0,0,0,0.1);border-radius:10px;overflow:hidden;background:#fbfbfa;}
+.mx .src-head{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;background:#0b1d5e;}
+.mx .src-title{font-size:12px;font-weight:600;color:#bc9762;letter-spacing:.02em;}
+.mx .src-manage{border:0.5px solid rgba(188,151,98,0.5);background:transparent;color:#d9c3a0;font-size:11px;padding:3px 10px;border-radius:7px;cursor:pointer;}
+.mx .src-manage:hover{background:rgba(188,151,98,0.14);}
+.mx .src-mpanel{padding:11px 13px;background:#f4f3f1;border-bottom:0.5px solid rgba(0,0,0,0.07);display:flex;flex-direction:column;gap:7px;}
+.mx .src-mhint{font-size:11px;color:#888786;line-height:1.4;margin-bottom:2px;}
+.mx .src-mrow{display:flex;align-items:center;gap:7px;}
+.mx .src-mname{flex:1;min-width:0;height:30px;padding:0 9px;border:0.5px solid rgba(0,0,0,0.14);border-radius:6px;background:#fff;font-size:12px;color:#1a1a1a;}
+.mx .src-mvendor{max-width:220px;}
+.mx .src-mbtn{height:30px;padding:0 11px;border:0.5px solid rgba(0,0,0,0.14);border-radius:6px;background:#fff;font-size:11px;color:#1a1a1a;cursor:pointer;white-space:nowrap;}
+.mx .src-mbtn.danger{color:#791F1F;border-color:rgba(121,31,31,0.25);}
+.mx .src-mbtn:hover{background:#f6f5f3;}
+.mx .src-add{align-self:flex-start;margin-top:2px;height:30px;padding:0 12px;border:0.5px dashed rgba(11,29,94,0.4);border-radius:6px;background:#fff;color:#0b1d5e;font-size:12px;font-weight:500;cursor:pointer;}
+.mx .src-table{width:100%;border-collapse:collapse;}
+.mx .src-table th{padding:7px 10px;font-size:10px;font-weight:600;color:#888786;text-transform:uppercase;letter-spacing:.03em;text-align:right;background:#f9f9f8;border-bottom:0.5px solid rgba(0,0,0,0.07);white-space:nowrap;}
+.mx .src-table th.src-th-name{text-align:left;}
+.mx .src-table td{padding:5px 10px;border-bottom:0.5px solid rgba(0,0,0,0.05);text-align:right;font-variant-numeric:tabular-nums;}
+.mx .src-name{text-align:left !important;font-size:12.5px;color:#1a1a1a;font-weight:500;}
+.mx .src-ds{color:#888786;font-size:12px;margin-right:1px;}
+.mx .src-input{width:84px;height:32px;border:0.5px solid rgba(0,0,0,0.12);border-radius:7px;background:#fff;text-align:right;font-size:15px;font-weight:600;color:#1a1a1a;padding:0 9px;font-variant-numeric:tabular-nums;}
+.mx .src-input:focus{border-color:#0b1d5e;outline:none;box-shadow:0 0 0 3px rgba(11,29,94,0.08);}
+.mx .src-input::placeholder{color:#cfcecb;font-weight:500;}
+.mx .src-total td{font-weight:700;color:#633806;background:#FAEEDA;font-size:13px;border-bottom:none;}
+.mx .src-total td:first-child{color:#633806;}
+.mx .src-empty{padding:14px 16px;font-size:12px;color:#888786;line-height:1.5;}
 .mx .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0b1d5e;color:#fff;font-size:12px;padding:8px 18px;border-radius:20px;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;}
 .mx .toast.show{opacity:1;}
 @media(max-width:700px){.mx .chart-2col,.mx .stat-grid{grid-template-columns:1fr 1fr;}}

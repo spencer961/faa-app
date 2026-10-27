@@ -45,6 +45,46 @@ export const METRICS = [
 export const KEY_METRICS = ['booking_rate', 'show_rate', 'close_rate', 'closed_value']
 export const INPUT_METRICS = METRICS.filter((m) => !m.calc)
 
+// ── Lead sources (Layer 2 — per-client ROI breakdown) ──────────────────
+// A client's leads/consults/closed-$ can be split by where they came from
+// (a marketing company like TIE, or a plain channel like "Referral"). The
+// list of sources is editable PER CLIENT and stored on the client profile:
+//   client.info.leadSources = [{ id, label, vendorId, archived }]
+// `vendorId` optionally links to the shared vendor directory (so "TIE" is the
+// same TIE everywhere); `label` is used when it's not a directory vendor.
+// Sources are ARCHIVED, never deleted, so past weeks keep their numbers.
+// Per-source values live on the normal metric entries as flat, prefixed keys
+// ("src:<sourceId>:<metricId>") so saving/aggregation/paste all keep working.
+// Which metrics can be split by source:
+export const SOURCE_METRICS = ['leads', 'consults_scheduled', 'closed_value']
+// Only LEADS rolls its per-source rows up into the overall total — every lead
+// has exactly one source, and leads are never entered as a separate daily
+// total. Consults/closed-$ already have authoritative totals (from daily or the
+// weekly single entry); their per-source numbers are ROI attribution shown
+// alongside, so folding them would double-count.
+export const SOURCE_FOLD = ['leads']
+export const uidSource = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+export const srcKey = (sid, mid) => 'src:' + sid + ':' + mid
+export const isSrcKey = (k) => typeof k === 'string' && k.startsWith('src:')
+export const parseSrcKey = (k) => { const p = k.split(':'); return { sid: p[1], mid: p[2] } }
+export const clientSources = (client) => (client?.info?.leadSources || [])
+export const activeSources = (client) => clientSources(client).filter((s) => !s.archived)
+export const sourceLabel = (src, vendors) => {
+  if (src?.vendorId && Array.isArray(vendors)) { const v = vendors.find((x) => x.id === src.vendorId); if (v) return v.name }
+  return src?.label || 'Source'
+}
+// Sum every per-source value in a bag of entries into { sid: { mid: total } }.
+export function aggregateSources(entries) {
+  const out = {}
+  entries.forEach((d) => Object.keys(d || {}).forEach((k) => {
+    if (!isSrcKey(k)) return
+    const { sid, mid } = parseSrcKey(k)
+    out[sid] = out[sid] || {}
+    out[sid][mid] = (out[sid][mid] || 0) + (parseFloat(d[k]) || 0)
+  }))
+  return out
+}
+
 export function fmtVal(m, v, short = false) {
   if (v === null || v === undefined || v === '') return '—'
   if (m.roas) return Math.round(v * 10) / 10 + 'x'
@@ -67,11 +107,29 @@ export function benchClass(m, v) {
   if (v >= m.bench.low) return 'good'; if (v >= m.bench.low * 0.75) return 'warn'; return 'bad'
 }
 
+// Fold a single entry's per-source rows into the metrics in SOURCE_FOLD, so a
+// week with per-source leads reports leads = sum of its sources (overriding any
+// stray direct total for that same entry). Done PER ENTRY — before summing —
+// so a history that mixes direct-total weeks and per-source weeks adds up right.
+export function effectiveEntry(d) {
+  let out = d, cloned = false
+  SOURCE_FOLD.forEach((mid) => {
+    const keys = Object.keys(d || {}).filter((k) => isSrcKey(k) && parseSrcKey(k).mid === mid)
+    if (!keys.length) return
+    const sum = keys.reduce((t, k) => t + (parseFloat(d[k]) || 0), 0)
+    if (!cloned) { out = { ...d }; cloned = true }
+    out[mid] = sum
+  })
+  return out
+}
+
 // Sum a set of daily entries and add the calculated fields.
 export function aggregate(entries) {
   const agg = {}
   entries.forEach((d) => {
-    INPUT_METRICS.forEach((m) => { if (d[m.id] !== undefined) agg[m.id] = (agg[m.id] || 0) + (parseFloat(d[m.id]) || 0) })
+    const eff = effectiveEntry(d)
+    INPUT_METRICS.forEach((m) => { if (eff[m.id] !== undefined) agg[m.id] = (agg[m.id] || 0) + (parseFloat(eff[m.id]) || 0) })
+    Object.keys(d || {}).forEach((k) => { if (isSrcKey(k)) agg[k] = (agg[k] || 0) + (parseFloat(d[k]) || 0) })
   })
   METRICS.forEach((m) => { if (m.calc) agg[m.id] = m.calc(agg) })
   return agg
@@ -98,7 +156,9 @@ export function bucketDaily(daily, period) {
   Object.entries(daily || {}).forEach(([dk, data]) => {
     const key = period === 'weekly' ? getWeekEnding(dk) : getMonthKey(dk)
     if (!buckets[key]) buckets[key] = {}
-    INPUT_METRICS.forEach((m) => { if (data[m.id] !== undefined) buckets[key][m.id] = (buckets[key][m.id] || 0) + (parseFloat(data[m.id]) || 0) })
+    const eff = effectiveEntry(data)
+    INPUT_METRICS.forEach((m) => { if (eff[m.id] !== undefined) buckets[key][m.id] = (buckets[key][m.id] || 0) + (parseFloat(eff[m.id]) || 0) })
+    Object.keys(data || {}).forEach((kk) => { if (isSrcKey(kk)) buckets[key][kk] = (buckets[key][kk] || 0) + (parseFloat(data[kk]) || 0) })
   })
   Object.keys(buckets).forEach((k) => { METRICS.filter((m) => m.calc).forEach((m) => { buckets[k][m.id] = m.calc(buckets[k]) }) })
   return buckets
